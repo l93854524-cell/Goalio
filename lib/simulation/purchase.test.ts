@@ -47,6 +47,21 @@ describe("evaluatePurchase envelope protection", () => {
     expect(result.earliestNoDelayDate).toBeNull();
   });
 
+  it("安全日期在第 365 天后时保持空值", () => {
+    const result = evaluatePurchase({
+      today: "2026-01-01",
+      balance: cents(10000),
+      plan: plan({
+        income: { cadence: "monthly", amount: cents(90000), nextDate: "2027-02-05" },
+        goal: { name: "长期目标", amount: cents(100000), deadline: "2027-02-05" },
+      }),
+      name: "小物件",
+      amount: cents(1000),
+    });
+
+    expect(result.earliestNoDelayDate).toBeNull();
+  });
+
   it("excludes a fully funded goal from the maximum no-delay purchase", () => {
     const result = evaluatePurchase({
       today: "2026-01-01",

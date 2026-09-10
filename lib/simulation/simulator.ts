@@ -1,8 +1,10 @@
-import { addDays, addMonths } from "@/lib/domain/dates";
+import { addDays, addMonths, daysBetween } from "@/lib/domain/dates";
 import { cents, clampCents, type Cents } from "@/lib/domain/money";
 import type { Cadence, GoalioPlan, ScheduledAmount } from "@/lib/domain/types";
 
 const RESERVE_HORIZON_DAYS = 365;
+const MIN_FORECAST_DAYS = 365;
+export const MAX_FORECAST_DAYS = 3650;
 
 export interface SimulationInput {
   today: string;
@@ -30,6 +32,11 @@ export type SimulationResult =
       effectiveSaved: Cents;
       change: Cents;
     };
+
+export function forecastHorizonDays(input: SimulationInput): number {
+  const deadlineDays = Math.max(0, daysBetween(input.today, input.plan.goal.deadline));
+  return Math.min(MAX_FORECAST_DAYS, Math.max(MIN_FORECAST_DAYS, deadlineDays + 365));
+}
 
 function advance(date: string, cadence: Cadence): string | null {
   if (cadence === "weekly") return addDays(date, 7);
@@ -69,7 +76,8 @@ function reservesForFlows(flows: number[]): Cents[] {
     while (minimums.length && prefix[minimums[minimums.length - 1]] >= prefix[end]) minimums.pop();
     minimums.push(end);
   }
-  for (let offset = 0; offset <= RESERVE_HORIZON_DAYS; offset += 1) {
+  const forecastDays = flows.length - RESERVE_HORIZON_DAYS - 1;
+  for (let offset = 0; offset <= forecastDays; offset += 1) {
     const end = offset + RESERVE_HORIZON_DAYS;
     while (minimums.length && minimums[0] <= offset) minimums.shift();
     while (minimums.length && prefix[minimums[minimums.length - 1]] >= prefix[end]) minimums.pop();
@@ -80,7 +88,8 @@ function reservesForFlows(flows: number[]): Cents[] {
 }
 
 function simulationTimeline(input: SimulationInput): SimulationTimeline {
-  const dates = Array.from({ length: RESERVE_HORIZON_DAYS * 2 + 1 }, (_, offset) => addDays(input.today, offset));
+  const forecastDays = forecastHorizonDays(input);
+  const dates = Array.from({ length: forecastDays + RESERVE_HORIZON_DAYS + 1 }, (_, offset) => addDays(input.today, offset));
   const dateOffsets = new Map(dates.map((date, offset) => [date, offset]));
   const flows = Array.from({ length: dates.length }, (_, offset) => offset === 0 ? 0 : -input.plan.dailyFood);
 
@@ -124,7 +133,7 @@ function projectedCompletionDate(input: SimulationInput, currentSaved: Cents, ti
   if (currentSaved >= input.plan.goal.amount) return input.today;
 
   let projectedBalance = balanceAfterTodayPurchase(input);
-  for (let offset = 1; offset <= RESERVE_HORIZON_DAYS; offset += 1) {
+  for (let offset = 1; offset <= forecastHorizonDays(input); offset += 1) {
     projectedBalance = cents(Math.max(0, projectedBalance + timeline.flows[offset]));
     if (allocatedToGoal(projectedBalance, timeline.reserves[offset], input.plan.goal.amount) >= input.plan.goal.amount) {
       return timeline.dates[offset];

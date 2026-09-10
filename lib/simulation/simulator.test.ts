@@ -94,6 +94,35 @@ describe("runSimulation envelope allocation", () => {
     expect(result.tomorrowMaxSpend).toBe(cents(0));
   });
 
+  it("预测一年以后到达的确定收入", () => {
+    const result = known(runSimulation({
+      today: "2026-01-01",
+      balance: cents(0),
+      plan: plan({
+        income: { cadence: "once", amount: cents(100000), nextDate: "2027-02-05" },
+        goal: { name: "长期目标", amount: cents(100000), deadline: "2027-02-05" },
+      }),
+    }));
+
+    expect(result.completionDate).toBe("2027-02-05");
+    expect(result.canMeetDeadline).toBe(true);
+  });
+
+  it("为每个长期预测日期保留完整的一年储备观察窗", () => {
+    const result = known(runSimulation({
+      today: "2026-01-01",
+      balance: cents(0),
+      plan: plan({
+        income: { cadence: "once", amount: cents(100000), nextDate: "2028-01-31" },
+        expenses: [{ cadence: "once", amount: cents(50000), nextDate: "2028-06-19" }],
+        goal: { name: "长期目标", amount: cents(100000), deadline: "2027-02-05" },
+      }),
+    }));
+
+    expect(result.completionDate).toBeNull();
+    expect(result.canMeetDeadline).toBe(false);
+  });
+
   it("keeps future data gaps explicit", () => {
     const result = runSimulation({
       today: "2026-09-10",

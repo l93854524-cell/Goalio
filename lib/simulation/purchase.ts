@@ -3,6 +3,8 @@ import { cents, type Cents } from "@/lib/domain/money";
 import type { GoalioPlan } from "@/lib/domain/types";
 import { runSimulation } from "./simulator";
 
+export const SAFE_PURCHASE_SEARCH_DAYS = 365;
+
 export interface PurchaseInput {
   today: string;
   balance: Cents;
@@ -53,7 +55,7 @@ function maxNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: C
 }
 
 function earliestNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: Cents): string | null {
-  for (let offset = 0; offset <= 365; offset += 1) {
+  for (let offset = 0; offset <= SAFE_PURCHASE_SEARCH_DAYS; offset += 1) {
     const date = addDays(input.today, offset);
     const result = projectedResult(input, input.amount, date);
     if (result?.status === "known" && result.completionDate !== null && result.completionDate <= baselineDate && result.effectiveSaved >= baselineSaved) return date;
