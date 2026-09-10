@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .playwright-cli/
+.superpowers/
 output/
 *.log
 .DS_Store
