@@ -32,6 +32,21 @@ describe("evaluatePurchase envelope protection", () => {
     if (result.kind === "shortfall") expect(result.amount).toBe(cents(500));
   });
 
+  it("returns no safe date when a purchase cannot preserve the goal within the forecast", () => {
+    const result = evaluatePurchase({
+      today: "2026-01-01",
+      balance: cents(40000),
+      plan: plan({
+        dailyFood: cents(100),
+        goal: { name: "目标", amount: cents(1000), deadline: "2026-01-31" },
+      }),
+      name: "鞋子",
+      amount: cents(4000),
+    });
+
+    expect(result.earliestNoDelayDate).toBeNull();
+  });
+
   it("excludes a fully funded goal from the maximum no-delay purchase", () => {
     const result = evaluatePurchase({
       today: "2026-01-01",
@@ -59,5 +74,23 @@ describe("evaluatePurchase envelope protection", () => {
 
     expect(result.kind).toBe("progress-reduced");
     expect(result.earliestNoDelayDate).toBe("2026-01-10");
+  });
+
+  it("目标进度减少时仍返回延期天数", () => {
+    const result = evaluatePurchase({
+      today: "2026-09-10",
+      balance: cents(150000),
+      plan: {
+        income: { cadence: "monthly", amount: cents(250000), nextDate: "2026-10-01" },
+        dailyFood: cents(3000),
+        expenses: [],
+        goal: { name: "目标", amount: cents(500000), deadline: "2027-01-08" },
+      },
+      name: "消费",
+      amount: cents(80000),
+    });
+
+    expect(result.kind).toBe("progress-reduced");
+    if (result.kind === "progress-reduced") expect(result.delayDays).toBeGreaterThan(0);
   });
 });

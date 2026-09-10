@@ -14,7 +14,7 @@ export interface PurchaseInput {
 
 type PurchaseKind =
   | { kind: "no-impact"; completionDate: string }
-  | { kind: "progress-reduced"; amount: Cents; baselineSaved: Cents; scenarioSaved: Cents; baselineDate: string; scenarioDate: string }
+  | { kind: "progress-reduced"; amount: Cents; baselineSaved: Cents; scenarioSaved: Cents; baselineDate: string; scenarioDate: string; delayDays: number }
   | { kind: "delayed-in-time"; baselineDate: string; scenarioDate: string; delayDays: number; deadline: string }
   | { kind: "delayed"; baselineDate: string; scenarioDate: string; delayDays: number }
   | { kind: "shortfall"; amount: Cents }
@@ -23,7 +23,7 @@ type PurchaseKind =
 
 export type PurchaseEvaluation = PurchaseKind & {
   maxNoDelayAmount: Cents;
-  earliestNoDelayDate: string;
+  earliestNoDelayDate: string | null;
 };
 
 function projectedResult(input: PurchaseInput, amount: Cents, date: string) {
@@ -52,13 +52,13 @@ function maxNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: C
   return cents(low);
 }
 
-function earliestNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: Cents): string {
+function earliestNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: Cents): string | null {
   for (let offset = 0; offset <= 365; offset += 1) {
     const date = addDays(input.today, offset);
     const result = projectedResult(input, input.amount, date);
     if (result?.status === "known" && result.completionDate !== null && result.completionDate <= baselineDate && result.effectiveSaved >= baselineSaved) return date;
   }
-  return addDays(input.today, 365);
+  return null;
 }
 
 export function evaluatePurchase(input: PurchaseInput): PurchaseEvaluation {
@@ -111,6 +111,7 @@ export function evaluatePurchase(input: PurchaseInput): PurchaseEvaluation {
       scenarioSaved: scenario.effectiveSaved,
       baselineDate: baseline.completionDate,
       scenarioDate,
+      delayDays,
       ...alternatives,
     };
   }
