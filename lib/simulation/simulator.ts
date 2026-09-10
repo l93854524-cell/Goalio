@@ -39,33 +39,31 @@ function advance(date: string, cadence: Cadence): string | null {
   return null;
 }
 
-function occursOn(rule: ScheduledAmount, date: string): boolean {
-  if (date < rule.nextDate || (rule.endDate && date > rule.endDate)) return false;
+interface SimulationTimeline {
+  dates: string[];
+  flows: number[];
+  reserves: Cents[];
+}
+
+function addScheduledFlows(flows: number[], dateOffsets: Map<string, number>, dates: string[], rule: ScheduledAmount, direction: 1 | -1) {
+  const firstDate = dates[1];
+  const lastDate = dates[dates.length - 1];
+  if (rule.endDate && rule.endDate < firstDate) return;
+
   let cursor: string | null = rule.nextDate;
-  while (cursor && cursor < date) cursor = advance(cursor, rule.cadence);
-  return cursor === date;
-}
-
-function cashflowForDate(plan: GoalioPlan, date: string, purchase?: SimulationInput["scenarioPurchase"]): number {
-  let flow = -plan.dailyFood;
-  if (plan.income && occursOn(plan.income, date)) flow += plan.income.amount;
-  for (const expense of plan.expenses) if (occursOn(expense, date)) flow -= expense.amount;
-  if (purchase?.date === date) flow -= purchase.amount;
-  return flow;
-}
-
-type ReserveTimeline = Map<string, Cents>;
-
-function reserveTimeline(input: SimulationInput): ReserveTimeline {
-  const flows = [0];
-  for (let offset = 1; offset <= RESERVE_HORIZON_DAYS * 2; offset += 1) {
-    flows.push(cashflowForDate(input.plan, addDays(input.today, offset), input.scenarioPurchase));
+  while (cursor && cursor < firstDate) cursor = advance(cursor, rule.cadence);
+  while (cursor && cursor <= lastDate && (!rule.endDate || cursor <= rule.endDate)) {
+    const offset = dateOffsets.get(cursor);
+    if (offset !== undefined) flows[offset] += direction * rule.amount;
+    cursor = advance(cursor, rule.cadence);
   }
+}
 
+function reservesForFlows(flows: number[]): Cents[] {
   const prefix = [0];
   for (let index = 1; index < flows.length; index += 1) prefix.push(prefix[index - 1] + flows[index]);
 
-  const timeline: ReserveTimeline = new Map();
+  const reserves: Cents[] = [];
   const minimums: number[] = [];
   for (let end = 1; end <= RESERVE_HORIZON_DAYS; end += 1) {
     while (minimums.length && prefix[minimums[minimums.length - 1]] >= prefix[end]) minimums.pop();
@@ -76,13 +74,31 @@ function reserveTimeline(input: SimulationInput): ReserveTimeline {
     while (minimums.length && minimums[0] <= offset) minimums.shift();
     while (minimums.length && prefix[minimums[minimums.length - 1]] >= prefix[end]) minimums.pop();
     minimums.push(end);
-    timeline.set(addDays(input.today, offset), cents(Math.max(0, prefix[offset] - prefix[minimums[0]])));
+    reserves.push(cents(Math.max(0, prefix[offset] - prefix[minimums[0]])));
   }
-  return timeline;
+  return reserves;
 }
 
-function requiredReserve(input: SimulationInput, timeline = reserveTimeline(input)): Cents {
-  return timeline.get(input.today) ?? cents(0);
+function simulationTimeline(input: SimulationInput): SimulationTimeline {
+  const dates = Array.from({ length: RESERVE_HORIZON_DAYS * 2 + 1 }, (_, offset) => addDays(input.today, offset));
+  const dateOffsets = new Map(dates.map((date, offset) => [date, offset]));
+  const flows = Array.from({ length: dates.length }, (_, offset) => offset === 0 ? 0 : -input.plan.dailyFood);
+
+  if (input.plan.income) addScheduledFlows(flows, dateOffsets, dates, input.plan.income, 1);
+  for (const expense of input.plan.expenses) addScheduledFlows(flows, dateOffsets, dates, expense, -1);
+
+  const purchaseOffset = input.scenarioPurchase ? dateOffsets.get(input.scenarioPurchase.date) : undefined;
+  if (purchaseOffset !== undefined && purchaseOffset > 0 && input.scenarioPurchase) {
+    flows[purchaseOffset] -= input.scenarioPurchase.amount;
+  }
+
+  return { dates, flows, reserves: reservesForFlows(flows) };
+}
+
+function timelineWithTomorrowPurchase(timeline: SimulationTimeline, amount: Cents): SimulationTimeline {
+  const flows = timeline.flows.slice();
+  flows[1] -= amount;
+  return { dates: timeline.dates, flows, reserves: reservesForFlows(flows) };
 }
 
 type KnownSimulation = Omit<Extract<SimulationResult, { status: "known" }>, "tomorrowFood" | "tomorrowMaxSpend" | "canMeetDeadline">;
@@ -97,29 +113,28 @@ function allocatedToGoal(balance: Cents, reserve: Cents, goalAmount: Cents): Cen
   return clampCents(balance - reserve, 0, goalAmount);
 }
 
-function currentEnvelope(input: SimulationInput, timeline?: ReserveTimeline) {
-  const reserve = requiredReserve(input, timeline);
+function currentEnvelope(input: SimulationInput, timeline: SimulationTimeline) {
+  const reserve = timeline.reserves[0] ?? cents(0);
   const adjustedBalance = balanceAfterTodayPurchase(input);
   const safeCapacity = allocatedToGoal(adjustedBalance, reserve, input.plan.goal.amount);
   return { reserve, adjustedBalance, safeCapacity };
 }
 
-function projectedCompletionDate(input: SimulationInput, currentSaved: Cents, timeline: ReserveTimeline): string | null {
+function projectedCompletionDate(input: SimulationInput, currentSaved: Cents, timeline: SimulationTimeline): string | null {
   if (currentSaved >= input.plan.goal.amount) return input.today;
 
   let projectedBalance = balanceAfterTodayPurchase(input);
-  for (let offset = 1; offset <= 365; offset += 1) {
-    const date = addDays(input.today, offset);
-    projectedBalance = cents(Math.max(0, projectedBalance + cashflowForDate(input.plan, date, input.scenarioPurchase)));
-    const projectedInput = { ...input, today: date, balance: projectedBalance };
-    const reserve = requiredReserve(projectedInput, timeline);
-    if (allocatedToGoal(projectedBalance, reserve, input.plan.goal.amount) >= input.plan.goal.amount) return date;
+  for (let offset = 1; offset <= RESERVE_HORIZON_DAYS; offset += 1) {
+    projectedBalance = cents(Math.max(0, projectedBalance + timeline.flows[offset]));
+    if (allocatedToGoal(projectedBalance, timeline.reserves[offset], input.plan.goal.amount) >= input.plan.goal.amount) {
+      return timeline.dates[offset];
+    }
   }
 
   return null;
 }
 
-function simulateKnown(input: SimulationInput, timeline = reserveTimeline(input)): KnownSimulation {
+function simulateKnown(input: SimulationInput, timeline: SimulationTimeline): KnownSimulation {
   const { reserve, safeCapacity } = currentEnvelope(input, timeline);
   const previousSaved = input.previous?.effectiveSaved ?? cents(0);
   const effectiveSaved = safeCapacity;
@@ -145,16 +160,16 @@ function meetsDeadline(input: SimulationInput, result: KnownSimulation): boolean
     && result.completionDate <= input.plan.goal.deadline;
 }
 
-function maxSpendTomorrow(input: SimulationInput, protectedSaved: Cents): Cents {
-  const tomorrow = addDays(input.today, 1);
-  const tomorrowFlow = cashflowForDate(input.plan, tomorrow);
+function maxSpendTomorrow(input: SimulationInput, protectedSaved: Cents, baseTimeline: SimulationTimeline): Cents {
+  const tomorrow = baseTimeline.dates[1];
+  const tomorrowFlow = baseTimeline.flows[1];
   let low = 0;
   let high = Math.max(0, input.balance + Math.max(0, tomorrowFlow));
 
   while (low < high) {
     const mid = Math.ceil((low + high) / 2);
     const scenario = { ...input, scenarioPurchase: { date: tomorrow, amount: cents(mid) } };
-    const timeline = reserveTimeline(scenario);
+    const timeline = timelineWithTomorrowPurchase(baseTimeline, scenario.scenarioPurchase.amount);
     if (currentEnvelope(scenario, timeline).safeCapacity < protectedSaved) {
       high = mid - 1;
       continue;
@@ -173,9 +188,12 @@ export function runSimulation(input: SimulationInput): SimulationResult {
     return { status: "unknown", missing: ["未来收入"], effectiveSaved: previousSaved, change: cents(0) };
   }
 
-  const result = simulateKnown(input);
+  const timeline = simulationTimeline(input);
+  const result = simulateKnown(input, timeline);
   const canMeetDeadline = meetsDeadline(input, result);
-  const tomorrowMaxSpend = !input.scenarioPurchase && canMeetDeadline ? maxSpendTomorrow(input, result.effectiveSaved) : cents(0);
+  const tomorrowMaxSpend = !input.scenarioPurchase && canMeetDeadline
+    ? maxSpendTomorrow(input, result.effectiveSaved, timeline)
+    : cents(0);
 
   return {
     ...result,
