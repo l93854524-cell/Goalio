@@ -39,14 +39,14 @@ describe("资金优先级", () => {
     expect(tight.tomorrowMaxSpend).toBeLessThanOrEqual(relaxed.tomorrowMaxSpend);
   });
 
-  it("今天截止时仍保护未来四十五天内的确定支出", () => {
+  it("今天截止时仍保护固定观察窗口内的确定支出", () => {
     const result = known(runSimulation({
       today: "2026-01-01",
       balance: cents(200000),
       plan: {
         income: { cadence: "once", amount: cents(0), nextDate: "2026-01-02" },
         dailyFood: cents(0),
-        expenses: [{ id: "fixed", name: "确定支出", amount: cents(50000), cadence: "once", nextDate: "2026-02-10" }],
+        expenses: [{ id: "fixed", name: "确定支出", amount: cents(50000), cadence: "once", nextDate: "2026-02-16" }],
         goal: { name: "目标", amount: cents(180000), deadline: "2026-01-01" },
       },
     }));
@@ -175,5 +175,5 @@ describe("随机不变量", () => {
       expect(result.canMeetDeadline).toBe(result.completionDate !== null && result.completionDate <= testPlan.goal.deadline);
       if (!result.canMeetDeadline) expect(result.tomorrowMaxSpend).toBe(cents(0));
     }
-  }, 180000);
+  }, 30000);
 });

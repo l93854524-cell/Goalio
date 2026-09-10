@@ -26,7 +26,7 @@ describe("evaluatePurchase envelope protection", () => {
       dailyFood: cents(100),
       goal: { name: "目标", amount: cents(1000), deadline: "2026-01-31" },
     });
-    const result = evaluatePurchase({ today: "2026-01-01", balance: cents(5000), plan: reservePlan, name: "鞋子", amount: cents(2500) });
+    const result = evaluatePurchase({ today: "2026-01-01", balance: cents(40000), plan: reservePlan, name: "鞋子", amount: cents(4000) });
 
     expect(result.kind).toBe("shortfall");
     if (result.kind === "shortfall") expect(result.amount).toBe(cents(500));

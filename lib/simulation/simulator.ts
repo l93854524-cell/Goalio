@@ -54,15 +54,35 @@ function cashflowForDate(plan: GoalioPlan, date: string, purchase?: SimulationIn
   return flow;
 }
 
-function requiredReserve(input: SimulationInput): Cents {
-  let cumulative = 0;
-  let lowest = 0;
-  for (let offset = 1; offset <= RESERVE_HORIZON_DAYS; offset += 1) {
-    const date = addDays(input.today, offset);
-    cumulative += cashflowForDate(input.plan, date, input.scenarioPurchase);
-    lowest = Math.min(lowest, cumulative);
+type ReserveTimeline = Map<string, Cents>;
+
+function reserveTimeline(input: SimulationInput): ReserveTimeline {
+  const flows = [0];
+  for (let offset = 1; offset <= RESERVE_HORIZON_DAYS * 2; offset += 1) {
+    flows.push(cashflowForDate(input.plan, addDays(input.today, offset), input.scenarioPurchase));
   }
-  return cents(Math.max(0, -lowest));
+
+  const prefix = [0];
+  for (let index = 1; index < flows.length; index += 1) prefix.push(prefix[index - 1] + flows[index]);
+
+  const timeline: ReserveTimeline = new Map();
+  const minimums: number[] = [];
+  for (let end = 1; end <= RESERVE_HORIZON_DAYS; end += 1) {
+    while (minimums.length && prefix[minimums[minimums.length - 1]] >= prefix[end]) minimums.pop();
+    minimums.push(end);
+  }
+  for (let offset = 0; offset <= RESERVE_HORIZON_DAYS; offset += 1) {
+    const end = offset + RESERVE_HORIZON_DAYS;
+    while (minimums.length && minimums[0] <= offset) minimums.shift();
+    while (minimums.length && prefix[minimums[minimums.length - 1]] >= prefix[end]) minimums.pop();
+    minimums.push(end);
+    timeline.set(addDays(input.today, offset), cents(Math.max(0, prefix[offset] - prefix[minimums[0]])));
+  }
+  return timeline;
+}
+
+function requiredReserve(input: SimulationInput, timeline = reserveTimeline(input)): Cents {
+  return timeline.get(input.today) ?? cents(0);
 }
 
 type KnownSimulation = Omit<Extract<SimulationResult, { status: "known" }>, "tomorrowFood" | "tomorrowMaxSpend" | "canMeetDeadline">;
@@ -77,14 +97,14 @@ function allocatedToGoal(balance: Cents, reserve: Cents, goalAmount: Cents): Cen
   return clampCents(balance - reserve, 0, goalAmount);
 }
 
-function currentEnvelope(input: SimulationInput) {
-  const reserve = requiredReserve(input);
+function currentEnvelope(input: SimulationInput, timeline?: ReserveTimeline) {
+  const reserve = requiredReserve(input, timeline);
   const adjustedBalance = balanceAfterTodayPurchase(input);
   const safeCapacity = allocatedToGoal(adjustedBalance, reserve, input.plan.goal.amount);
   return { reserve, adjustedBalance, safeCapacity };
 }
 
-function projectedCompletionDate(input: SimulationInput, currentSaved: Cents): string | null {
+function projectedCompletionDate(input: SimulationInput, currentSaved: Cents, timeline: ReserveTimeline): string | null {
   if (currentSaved >= input.plan.goal.amount) return input.today;
 
   let projectedBalance = balanceAfterTodayPurchase(input);
@@ -92,19 +112,19 @@ function projectedCompletionDate(input: SimulationInput, currentSaved: Cents): s
     const date = addDays(input.today, offset);
     projectedBalance = cents(Math.max(0, projectedBalance + cashflowForDate(input.plan, date, input.scenarioPurchase)));
     const projectedInput = { ...input, today: date, balance: projectedBalance };
-    const reserve = requiredReserve(projectedInput);
+    const reserve = requiredReserve(projectedInput, timeline);
     if (allocatedToGoal(projectedBalance, reserve, input.plan.goal.amount) >= input.plan.goal.amount) return date;
   }
 
   return null;
 }
 
-function simulateKnown(input: SimulationInput): KnownSimulation {
-  const { reserve, safeCapacity } = currentEnvelope(input);
+function simulateKnown(input: SimulationInput, timeline = reserveTimeline(input)): KnownSimulation {
+  const { reserve, safeCapacity } = currentEnvelope(input, timeline);
   const previousSaved = input.previous?.effectiveSaved ?? cents(0);
   const effectiveSaved = safeCapacity;
   const change = cents(effectiveSaved - previousSaved);
-  const completionDate = projectedCompletionDate(input, effectiveSaved);
+  const completionDate = projectedCompletionDate(input, effectiveSaved, timeline);
 
   return {
     status: "known",
@@ -134,11 +154,12 @@ function maxSpendTomorrow(input: SimulationInput, protectedSaved: Cents): Cents 
   while (low < high) {
     const mid = Math.ceil((low + high) / 2);
     const scenario = { ...input, scenarioPurchase: { date: tomorrow, amount: cents(mid) } };
-    if (currentEnvelope(scenario).safeCapacity < protectedSaved) {
+    const timeline = reserveTimeline(scenario);
+    if (currentEnvelope(scenario, timeline).safeCapacity < protectedSaved) {
       high = mid - 1;
       continue;
     }
-    const result = simulateKnown(scenario);
+    const result = simulateKnown(scenario, timeline);
     if (meetsDeadline(scenario, result)) low = mid;
     else high = mid - 1;
   }
