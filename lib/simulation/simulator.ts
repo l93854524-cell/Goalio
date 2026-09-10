@@ -1,6 +1,8 @@
-import { addDays, addMonths, daysBetween } from "@/lib/domain/dates";
+import { addDays, addMonths } from "@/lib/domain/dates";
 import { cents, clampCents, type Cents } from "@/lib/domain/money";
 import type { Cadence, GoalioPlan, ScheduledAmount } from "@/lib/domain/types";
+
+const RESERVE_HORIZON_DAYS = 365;
 
 export interface SimulationInput {
   today: string;
@@ -53,10 +55,9 @@ function cashflowForDate(plan: GoalioPlan, date: string, purchase?: SimulationIn
 }
 
 function requiredReserve(input: SimulationInput): Cents {
-  const horizonDays = Math.min(45, Math.max(30, daysBetween(input.today, input.plan.goal.deadline)));
   let cumulative = 0;
   let lowest = 0;
-  for (let offset = 1; offset <= horizonDays; offset += 1) {
+  for (let offset = 1; offset <= RESERVE_HORIZON_DAYS; offset += 1) {
     const date = addDays(input.today, offset);
     cumulative += cashflowForDate(input.plan, date, input.scenarioPurchase);
     lowest = Math.min(lowest, cumulative);

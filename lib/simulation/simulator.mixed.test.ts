@@ -25,6 +25,37 @@ function known(result: SimulationResult) {
 }
 
 describe("资金优先级", () => {
+  it("截止日期提前不会通过缩短预留窗口提高消费上限", () => {
+    const makePlan = (deadline: string): GoalioPlan => ({
+      income: { cadence: "once", amount: cents(0), nextDate: "2026-01-02" },
+      dailyFood: cents(1000),
+      expenses: [],
+      goal: { name: "目标", amount: cents(10000), deadline },
+    });
+    const relaxed = known(runSimulation({ today: "2026-01-01", balance: cents(100000), plan: makePlan("2026-02-15") }));
+    const tight = known(runSimulation({ today: "2026-01-01", balance: cents(100000), plan: makePlan("2026-01-31") }));
+
+    expect(tight.requiredReserve).toBe(relaxed.requiredReserve);
+    expect(tight.tomorrowMaxSpend).toBeLessThanOrEqual(relaxed.tomorrowMaxSpend);
+  });
+
+  it("今天截止时仍保护未来四十五天内的确定支出", () => {
+    const result = known(runSimulation({
+      today: "2026-01-01",
+      balance: cents(200000),
+      plan: {
+        income: { cadence: "once", amount: cents(0), nextDate: "2026-01-02" },
+        dailyFood: cents(0),
+        expenses: [{ id: "fixed", name: "确定支出", amount: cents(50000), cadence: "once", nextDate: "2026-02-10" }],
+        goal: { name: "目标", amount: cents(180000), deadline: "2026-01-01" },
+      },
+    }));
+
+    expect(result.requiredReserve).toBe(cents(50000));
+    expect(result.effectiveSaved).toBe(cents(150000));
+    expect(result.canMeetDeadline).toBe(false);
+  });
+
   it("先保护未来必要支出，再把全部安全容量归入目标", () => {
     const result = known(runSimulation({
       today: "2026-01-01",
@@ -32,9 +63,9 @@ describe("资金优先级", () => {
       plan: plan({ dailyFood: cents(100), goal: { name: "短期目标", amount: cents(10000), deadline: "2026-01-31" } }),
     }));
 
-    expect(result.requiredReserve).toBe(cents(3000));
-    expect(result.safeCapacity).toBe(cents(2000));
-    expect(result.effectiveSaved).toBe(cents(2000));
+    expect(result.requiredReserve).toBe(cents(36500));
+    expect(result.safeCapacity).toBe(cents(0));
+    expect(result.effectiveSaved).toBe(cents(0));
   });
 
   it("余额增加不会减少目标分配或推迟完成日期", () => {
@@ -144,5 +175,5 @@ describe("随机不变量", () => {
       expect(result.canMeetDeadline).toBe(result.completionDate !== null && result.completionDate <= testPlan.goal.deadline);
       if (!result.canMeetDeadline) expect(result.tomorrowMaxSpend).toBe(cents(0));
     }
-  }, 15000);
+  }, 180000);
 });
