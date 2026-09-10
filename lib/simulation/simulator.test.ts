@@ -122,7 +122,7 @@ describe("runSimulation envelope allocation", () => {
       ...input,
       plan: {
         ...input.plan,
-        expenses: [{ cadence: "once", amount: cents(50000), nextDate: "2028-06-19" }],
+        expenses: [{ id: "future-expense", name: "未来支出", cadence: "once", amount: cents(50000), nextDate: "2028-06-19" }],
       },
     }));
 
