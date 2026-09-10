@@ -506,6 +506,41 @@ describe("GoalioApp", () => {
     expect(screen.queryByRole("heading", { name: "今天手上还有多少？" })).not.toBeInTheDocument();
   });
 
+  it("同日重复提交相同余额时保持当天变化文案稳定，刷新后也一致", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
+    localStorage.setItem("goalio:v1", JSON.stringify({
+      version: 1,
+      screen: "daily-balance",
+      onboarded: true,
+      plan: {
+        income: { cadence: "monthly", amount: 250000, nextDate: "2026-09-10" },
+        dailyFood: 4000,
+        expenses: [],
+        goal: { name: "一台新电脑", amount: 800000, deadline: "2026-12-20" },
+      },
+      balance: 300000,
+      history: [{ date: "2026-09-05", balance: 300000, effectiveSaved: 62000 }],
+      lastResult: { date: "2026-09-05", balance: 300000, effectiveSaved: 62000 },
+      purchase: null,
+    }));
+    const user = userEvent.setup();
+    const app = render(<GoalioApp />);
+
+    const balance = await screen.findByRole("textbox", { name: "当前真实余额" });
+    await user.clear(balance);
+    await user.type(balance, "3200");
+    await user.click(screen.getByRole("button", { name: "更新余额" }));
+
+    const firstChange = (await screen.findByText(/今天多留了/)).textContent;
+    await user.click(screen.getByRole("button", { name: "更新余额" }));
+    await user.click(screen.getByRole("button", { name: "更新余额" }));
+    expect(await screen.findByText(/今天多留了/)).toHaveTextContent(firstChange ?? "");
+
+    app.unmount();
+    render(<GoalioApp />);
+    expect(await screen.findByText(/今天多留了/)).toHaveTextContent(firstChange ?? "");
+  });
+
   it("edits an existing fixed expense in place and saves it immediately", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
     localStorage.setItem("goalio:v1", JSON.stringify({

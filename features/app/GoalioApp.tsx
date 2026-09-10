@@ -5,7 +5,7 @@ import { CalendarBlank, CheckCircle, Wallet, Warning } from "@phosphor-icons/rea
 import { PressableButton } from "@/components/ui/PressableButton";
 import { addDays, formatChineseDate, formatChineseFullDate, todayISO } from "@/lib/domain/dates";
 import { cents, formatYuan, parseYuan, type Cents } from "@/lib/domain/money";
-import type { Cadence, FixedExpense } from "@/lib/domain/types";
+import type { BalanceSnapshot, Cadence, FixedExpense } from "@/lib/domain/types";
 import { evaluatePurchase, type PurchaseEvaluation } from "@/lib/simulation/purchase";
 import { runSimulation } from "@/lib/simulation/simulator";
 import { createInitialState, type GoalioState, type ScreenName } from "@/lib/storage/schema";
@@ -209,13 +209,21 @@ function FoodScreen({ state, update, go }: ScreenProps) {
   );
 }
 
+function previousSnapshot(state: GoalioState, today: string): BalanceSnapshot | undefined {
+  const candidates = [
+    ...state.history,
+    ...(state.lastResult ? [state.lastResult] : []),
+  ].filter(snapshot => snapshot.date < today);
+  return candidates.sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
 function applyPlanChange(state: GoalioState, plan: GoalioState["plan"], today: string): GoalioState {
   if (!state.onboarded || !state.lastResult) return { ...state, plan };
   const result = runSimulation({
     today,
     balance: state.balance,
     plan,
-    previous: { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved },
+    previous: previousSnapshot(state, today),
   });
   const snapshot = { date: today, balance: state.balance, effectiveSaved: result.effectiveSaved };
   return {
@@ -365,7 +373,7 @@ function BalanceScreen({ state, update, daily = false, today }: ScreenProps & { 
   const dailyCheckIn = daily && !afterPurchase;
   const [amountValid, setAmountValid] = useState(true);
   function submit() {
-    const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
+    const previous = previousSnapshot(state, today);
     const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
     const snapshot = { date: today, balance: state.balance, effectiveSaved: result.effectiveSaved };
     update(draft => ({
@@ -404,7 +412,7 @@ function needsDailyCheckIn(state: GoalioState, today: string) {
 }
 
 function HomeScreen({ state, go, today }: ScreenProps & { today: string }) {
-  const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
+  const previous = previousSnapshot(state, today);
   const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
   const saved = result.effectiveSaved;
   const progress = Math.min(100, Math.round((saved / state.plan.goal.amount) * 1000) / 10);
@@ -489,7 +497,7 @@ function resultCopy(result: PurchaseEvaluation) {
 
 function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: string }) {
   const purchase = state.purchase ?? { name: "耳机", amount: cents(119900) };
-  const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
+  const previous = previousSnapshot(state, today);
   const result = evaluatePurchase({ today, balance: state.balance, plan: state.plan, previous, ...purchase });
   const copy = resultCopy(result);
   const noImpact = result.kind === "no-impact";
@@ -603,7 +611,7 @@ export function GoalioApp() {
     case "initial-balance": view = <BalanceScreen {...props} today={today} />; break;
     case "daily-balance": view = <BalanceScreen {...props} daily today={today} />; break;
     case "home": {
-      const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
+      const previous = previousSnapshot(state, today);
       const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
       view = result.status === "known" && result.effectiveSaved >= state.plan.goal.amount
         ? <CompleteScreen {...props} />
