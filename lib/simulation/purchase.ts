@@ -100,7 +100,7 @@ export function evaluatePurchase(input: PurchaseInput): PurchaseEvaluation {
 
   const projected = projectedResult(input, input.amount, input.today);
   if (projected?.status === "unknown") return { kind: "unknown", missing: projected.missing, ...fallback };
-  if (!projected || !projected.completionDate) return { kind: "unreachable", ...fallback };
+  if (!projected || !projected.completionDate) return { kind: "unreachable", ...alternatives };
   const scenarioDate = projected.completionDate;
 
   const delayDays = Math.max(0, daysBetween(baseline.completionDate, scenarioDate));

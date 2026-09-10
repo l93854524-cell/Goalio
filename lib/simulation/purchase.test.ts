@@ -62,6 +62,48 @@ describe("evaluatePurchase envelope protection", () => {
     expect(result.earliestNoDelayDate).toBeNull();
   });
 
+  it("今日购买使第 400 天的单次收入目标不可达时保留安全日搜索结果", () => {
+    const result = evaluatePurchase({
+      today: "2026-01-01",
+      balance: cents(10000),
+      plan: plan({
+        income: { cadence: "once", amount: cents(90000), nextDate: "2027-02-05" },
+        goal: { name: "长期目标", amount: cents(100000), deadline: "2027-02-05" },
+      }),
+      name: "小物件",
+      amount: cents(1000),
+    });
+
+    expect(result.kind).toBe("unreachable");
+    expect(result.earliestNoDelayDate).toBeNull();
+  });
+
+  it("可发现第 365 天的安全日但不搜索第 366 天", () => {
+    const input = {
+      today: "2026-01-01",
+      balance: cents(10000),
+      name: "小物件",
+      amount: cents(1000),
+    };
+    const safeOnDay365 = evaluatePurchase({
+      ...input,
+      plan: plan({
+        income: { cadence: "once", amount: cents(91000), nextDate: "2027-01-01" },
+        goal: { name: "长期目标", amount: cents(100000), deadline: "2027-01-01" },
+      }),
+    });
+    const safeOnDay366 = evaluatePurchase({
+      ...input,
+      plan: plan({
+        income: { cadence: "once", amount: cents(91000), nextDate: "2027-01-02" },
+        goal: { name: "长期目标", amount: cents(100000), deadline: "2027-01-02" },
+      }),
+    });
+
+    expect(safeOnDay365.earliestNoDelayDate).toBe("2027-01-01");
+    expect(safeOnDay366.earliestNoDelayDate).toBeNull();
+  });
+
   it("excludes a fully funded goal from the maximum no-delay purchase", () => {
     const result = evaluatePurchase({
       today: "2026-01-01",

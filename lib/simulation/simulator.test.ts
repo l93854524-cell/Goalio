@@ -109,18 +109,26 @@ describe("runSimulation envelope allocation", () => {
   });
 
   it("为每个长期预测日期保留完整的一年储备观察窗", () => {
-    const result = known(runSimulation({
+    const input = {
       today: "2026-01-01",
       balance: cents(0),
       plan: plan({
         income: { cadence: "once", amount: cents(100000), nextDate: "2028-01-31" },
-        expenses: [{ cadence: "once", amount: cents(50000), nextDate: "2028-06-19" }],
         goal: { name: "长期目标", amount: cents(100000), deadline: "2027-02-05" },
       }),
+    };
+    const withoutExpense = known(runSimulation(input));
+    const withExpense = known(runSimulation({
+      ...input,
+      plan: {
+        ...input.plan,
+        expenses: [{ cadence: "once", amount: cents(50000), nextDate: "2028-06-19" }],
+      },
     }));
 
-    expect(result.completionDate).toBeNull();
-    expect(result.canMeetDeadline).toBe(false);
+    expect(withoutExpense.completionDate).toBe("2028-01-31");
+    expect(withExpense.completionDate).toBeNull();
+    expect(withExpense.canMeetDeadline).toBe(false);
   });
 
   it("keeps future data gaps explicit", () => {
