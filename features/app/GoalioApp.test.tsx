@@ -1,16 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import * as purchaseSimulation from "@/lib/simulation/purchase";
-import { cents } from "@/lib/domain/money";
 import { GoalioApp } from "./GoalioApp";
 
 describe("GoalioApp", () => {
   beforeEach(() => localStorage.clear());
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-  });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("immediately completes a fully funded goal after same-day goal and balance changes", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
@@ -293,59 +288,6 @@ describe("GoalioApp", () => {
     expect(await screen.findByRole("heading", { name: /最近有想买的东西吗/ })).toBeVisible();
   });
 
-  it("reports both reduced progress and the resulting completion delay", async () => {
-    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
-    localStorage.setItem("goalio:v1", JSON.stringify({
-      version: 1,
-      screen: "purchase-result",
-      onboarded: true,
-      plan: {
-        income: { cadence: "monthly", amount: 250000, nextDate: "2026-10-01" },
-        dailyFood: 3000,
-        expenses: [],
-        goal: { name: "目标", amount: 500000, deadline: "2027-01-08" },
-      },
-      balance: 160000,
-      history: [],
-      lastResult: { date: "2026-09-06", balance: 160000, effectiveSaved: 88000 },
-      purchase: { name: "消费", amount: 80000 },
-    }));
-    render(<GoalioApp />);
-
-    expect(await screen.findByText("目标进度减少 ¥800")).toBeVisible();
-    expect(screen.getByText(/预计晚 31 天完成/)).toBeVisible();
-  });
-
-  it("states when the forecast has no safe purchase date", async () => {
-    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
-    vi.spyOn(purchaseSimulation, "evaluatePurchase").mockReturnValue({
-      kind: "delayed",
-      baselineDate: "2026-10-01",
-      scenarioDate: "2026-11-01",
-      delayDays: 31,
-      maxNoDelayAmount: cents(0),
-      earliestNoDelayDate: null,
-    });
-    localStorage.setItem("goalio:v1", JSON.stringify({
-      version: 1,
-      screen: "purchase-result",
-      onboarded: true,
-      plan: {
-        income: { cadence: "monthly", amount: 250000, nextDate: "2026-10-01" },
-        dailyFood: 3000,
-        expenses: [],
-        goal: { name: "目标", amount: 500000, deadline: "2027-01-08" },
-      },
-      balance: 160000,
-      history: [],
-      lastResult: { date: "2026-09-06", balance: 160000, effectiveSaved: 88000 },
-      purchase: { name: "消费", amount: 80000 },
-    }));
-    render(<GoalioApp />);
-
-    expect(await screen.findByText("当前预测期内暂无安全购买日期")).toBeVisible();
-  });
-
   it("shows the current date in the home top bar", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
     localStorage.setItem("goalio:v1", JSON.stringify({
@@ -562,41 +504,6 @@ describe("GoalioApp", () => {
     render(<GoalioApp />);
     expect(await screen.findByRole("heading", { name: /正在为「一台新电脑」准备/ })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "今天手上还有多少？" })).not.toBeInTheDocument();
-  });
-
-  it("同日重复提交相同余额时保持当天变化文案稳定，刷新后也一致", async () => {
-    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
-    localStorage.setItem("goalio:v1", JSON.stringify({
-      version: 1,
-      screen: "daily-balance",
-      onboarded: true,
-      plan: {
-        income: { cadence: "monthly", amount: 250000, nextDate: "2026-09-10" },
-        dailyFood: 4000,
-        expenses: [],
-        goal: { name: "一台新电脑", amount: 800000, deadline: "2026-12-20" },
-      },
-      balance: 300000,
-      history: [{ date: "2026-09-05", balance: 300000, effectiveSaved: 62000 }],
-      lastResult: { date: "2026-09-05", balance: 300000, effectiveSaved: 62000 },
-      purchase: null,
-    }));
-    const user = userEvent.setup();
-    const app = render(<GoalioApp />);
-
-    const balance = await screen.findByRole("textbox", { name: "当前真实余额" });
-    await user.clear(balance);
-    await user.type(balance, "3200");
-    await user.click(screen.getByRole("button", { name: "更新余额" }));
-
-    const firstChange = (await screen.findByText(/今天多留了/)).textContent;
-    await user.click(screen.getByRole("button", { name: "更新余额" }));
-    await user.click(screen.getByRole("button", { name: "更新余额" }));
-    expect(await screen.findByText(/今天多留了/)).toHaveTextContent(firstChange ?? "");
-
-    app.unmount();
-    render(<GoalioApp />);
-    expect(await screen.findByText(/今天多留了/)).toHaveTextContent(firstChange ?? "");
   });
 
   it("edits an existing fixed expense in place and saves it immediately", async () => {
