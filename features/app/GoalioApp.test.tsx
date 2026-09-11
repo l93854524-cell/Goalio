@@ -680,6 +680,53 @@ describe("GoalioApp", () => {
     expect(await screen.findByRole("heading", { name: "设置" })).toBeVisible();
   });
 
+  it("shows the saved income cadence in settings", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
+    localStorage.setItem("goalio:v1", JSON.stringify({
+      version: 1,
+      screen: "settings",
+      onboarded: true,
+      plan: {
+        income: { cadence: "weekly", amount: 50000, nextDate: "2026-09-14" },
+        dailyFood: 2000,
+        expenses: [],
+        goal: { name: "Apple Watch", amount: 150000, deadline: "2026-10-07" },
+      },
+      balance: 88000,
+      history: [],
+      lastResult: { date: "2026-09-06", balance: 88000, effectiveSaved: 5556 },
+      purchase: null,
+    }));
+
+    render(<GoalioApp />);
+
+    expect(await screen.findByText("每周 ¥500 · 下次 9 月 14 日到账")).toBeVisible();
+    expect(screen.queryByText(/每月 ¥500/)).not.toBeInTheDocument();
+  });
+
+  it("rolls a weekly income summary forward from its saved first date", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
+    localStorage.setItem("goalio:v1", JSON.stringify({
+      version: 1,
+      screen: "settings",
+      onboarded: true,
+      plan: {
+        income: { cadence: "weekly", amount: 50000, nextDate: "2026-08-31" },
+        dailyFood: 2000,
+        expenses: [],
+        goal: { name: "Apple Watch", amount: 150000, deadline: "2026-10-07" },
+      },
+      balance: 88000,
+      history: [],
+      lastResult: { date: "2026-09-06", balance: 88000, effectiveSaved: 5556 },
+      purchase: null,
+    }));
+
+    render(<GoalioApp />);
+
+    expect(await screen.findByText("每周 ¥500 · 下次 9 月 7 日到账")).toBeVisible();
+  });
+
   it("keeps the setup progress and continue action when rearranging an existing plan", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
     localStorage.setItem("goalio:v1", JSON.stringify({

@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CalendarBlank, CheckCircle, Wallet, Warning } from "@phosphor-icons/react";
 import { PressableButton } from "@/components/ui/PressableButton";
-import { addDays, formatChineseDate, formatChineseFullDate, todayISO } from "@/lib/domain/dates";
+import { addDays, addMonths, formatChineseDate, formatChineseFullDate, todayISO } from "@/lib/domain/dates";
 import { cents, formatYuan, parseYuan, type Cents } from "@/lib/domain/money";
-import type { BalanceSnapshot, Cadence, FixedExpense } from "@/lib/domain/types";
+import type { BalanceSnapshot, Cadence, FixedExpense, ScheduledAmount } from "@/lib/domain/types";
 import { evaluatePurchase, type PurchaseEvaluation } from "@/lib/simulation/purchase";
 import { runSimulation } from "@/lib/simulation/simulator";
 import { createInitialState, type GoalioState, type ScreenName } from "@/lib/storage/schema";
@@ -18,6 +18,22 @@ const CADENCES: { value: Cadence; label: string }[] = [
   { value: "half-yearly", label: "每半年" },
   { value: "once", label: "一次性" },
 ];
+
+function cadenceLabel(cadence: Cadence) {
+  return CADENCES.find(option => option.value === cadence)?.label ?? cadence;
+}
+
+function nextIncomeDate(income: ScheduledAmount, today: string) {
+  let date = income.nextDate;
+  while (date < today) {
+    if (income.cadence === "weekly") date = addDays(date, 7);
+    else if (income.cadence === "monthly") date = addMonths(date, 1);
+    else if (income.cadence === "quarterly") date = addMonths(date, 3);
+    else if (income.cadence === "half-yearly") date = addMonths(date, 6);
+    else break;
+  }
+  return date;
+}
 
 function Logo() {
   return <div className="logo" aria-label="Goalio">Goalio</div>;
@@ -531,14 +547,15 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
   );
 }
 
-function SettingsScreen({ state, go }: ScreenProps) {
+function SettingsScreen({ state, go, today }: ScreenProps & { today: string }) {
   const income = state.plan.income;
+  const incomeDate = income ? nextIncomeDate(income, today) : null;
   return (
     <Screen>
       <header className="modal-header"><IconButton label="关闭设置" onClick={() => go("home")}>×</IconButton><h1>设置</h1><span /></header>
       <div className="content settings-content">
         <div className="settings-list">
-          <button onClick={() => go("income")}><strong>未来收入</strong><span>{income ? `每月 ${formatYuan(income.amount)} · ${Number(income.nextDate.slice(-2))} 日到账` : "尚未填写"}</span><b>›</b></button>
+          <button onClick={() => go("income")}><strong>未来收入</strong><span>{income && incomeDate ? `${cadenceLabel(income.cadence)} ${formatYuan(income.amount)} · 下次 ${formatChineseDate(incomeDate)}到账` : "尚未填写"}</span><b>›</b></button>
           <button onClick={() => go("food")}><strong>每天的基本饮食</strong><span>{formatYuan(state.plan.dailyFood)}</span><b>›</b></button>
           <button onClick={() => go("settings-expenses")}><strong>固定支出</strong><span>{state.plan.expenses.length} 笔 · 每月 {formatYuan(cents(state.plan.expenses.reduce((sum, item) => sum + item.amount, 0)))}</span><b>›</b></button>
           <button onClick={() => go("goal")}><strong>当前目标</strong><span>{state.plan.goal.name} · {formatYuan(state.plan.goal.amount)} · {formatChineseDate(state.plan.goal.deadline)}</span><b>›</b></button>
@@ -622,7 +639,7 @@ export function GoalioApp() {
     }
     case "purchase-input": view = <PurchaseInputScreen {...props} />; break;
     case "purchase-result": view = <PurchaseResultScreen {...props} today={today} />; break;
-    case "settings": view = <SettingsScreen {...props} />; break;
+    case "settings": view = <SettingsScreen {...props} today={today} />; break;
     case "complete": view = <CompleteScreen {...props} />; break;
     case "post-purchase": view = <BalanceScreen {...props} daily today={today} />; break;
     case "finished": view = <FinishedScreen state={state} />; break;
