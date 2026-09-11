@@ -109,6 +109,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .add-row:active { opacity: .55; transform: scale(.98); }
 .goal-fields { padding: 0 16px; margin-top: 40px; }
 .goal-fields label { grid-template-columns: 1fr minmax(120px, 48%) 26px; min-height: 76px; }
+.goal-fields input::placeholder { color: #b5b5bc; opacity: 1; font-weight: 450; }
 .goal-fields i { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--blue); color: #fff; font-style: normal; font-size: 13px; }
 .balance-content { padding-top: clamp(74px, 14vh, 130px); }
 .balance-content .money-field { border-color: var(--line); height: 150px; }

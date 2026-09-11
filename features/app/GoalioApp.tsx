@@ -5,7 +5,7 @@ import { CalendarBlank, CheckCircle, Wallet, Warning } from "@phosphor-icons/rea
 import { PressableButton } from "@/components/ui/PressableButton";
 import { addDays, formatChineseDate, formatChineseFullDate, todayISO } from "@/lib/domain/dates";
 import { cents, formatYuan, parseYuan, type Cents } from "@/lib/domain/money";
-import type { Cadence, FixedExpense } from "@/lib/domain/types";
+import type { BalanceSnapshot, Cadence, FixedExpense } from "@/lib/domain/types";
 import { evaluatePurchase, type PurchaseEvaluation } from "@/lib/simulation/purchase";
 import { runSimulation } from "@/lib/simulation/simulator";
 import { createInitialState, type GoalioState, type ScreenName } from "@/lib/storage/schema";
@@ -62,13 +62,14 @@ function DailyDate({ date }: { date: string }) {
   );
 }
 
-function AmountInput({ value, onChange, onValidityChange, label, allowZero = true, autoFocus = false, selectOnFocus = false }: { value: Cents; onChange: (value: Cents) => void; onValidityChange?: (valid: boolean) => void; label: string; allowZero?: boolean; autoFocus?: boolean; selectOnFocus?: boolean }) {
+function AmountInput({ value, onChange, onValidityChange, label, allowZero = true, autoFocus = false, selectOnFocus = false, placeholder, emptyWhenZero = false }: { value: Cents; onChange: (value: Cents) => void; onValidityChange?: (valid: boolean) => void; label: string; allowZero?: boolean; autoFocus?: boolean; selectOnFocus?: boolean; placeholder?: string; emptyWhenZero?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
     <input
       autoFocus={autoFocus}
       inputMode="decimal"
-      value={draft ?? String(value / 100)}
+      value={draft ?? (emptyWhenZero && value === 0 ? "" : String(value / 100))}
+      placeholder={placeholder}
       aria-label={label}
       onFocus={selectOnFocus ? event => event.currentTarget.select() : undefined}
       onBlur={() => setDraft(null)}
@@ -215,7 +216,7 @@ function applyPlanChange(state: GoalioState, plan: GoalioState["plan"], today: s
     today,
     balance: state.balance,
     plan,
-    previous: { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved },
+    previous: previousSnapshot(state, today),
   });
   const snapshot = { date: today, balance: state.balance, effectiveSaved: result.effectiveSaved };
   return {
@@ -225,6 +226,16 @@ function applyPlanChange(state: GoalioState, plan: GoalioState["plan"], today: s
     lastChange: result.change,
     history: [...state.history.filter(item => item.date !== today), snapshot],
   };
+}
+
+function previousSnapshot(state: GoalioState, today: string): Pick<BalanceSnapshot, "date" | "effectiveSaved"> | undefined {
+  const candidates = [
+    ...state.history,
+    ...(state.lastResult ? [state.lastResult] : []),
+  ].filter(snapshot => snapshot.date < today);
+  candidates.sort((left, right) => right.date.localeCompare(left.date));
+  const previous = candidates[0];
+  return previous ? { date: previous.date, effectiveSaved: previous.effectiveSaved } : undefined;
 }
 
 function ExpensesScreen({ state, update, go, today }: ScreenProps & { today: string }) {
@@ -346,9 +357,9 @@ function GoalScreen({ state, update, go, today }: ScreenProps & { today: string 
         <h1>最近想为哪件事慢慢攒钱？</h1>
         <p className="lead">一次专注一个目标，会更容易看清每天的进展。</p>
         <div className="panel detail-group goal-fields">
-          <label><span>目标名称</span><input aria-label="目标名称" value={goal.name} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, name: event.target.value } } }))} /><i>✓</i></label>
-          <label><span>目标金额</span><AmountInput allowZero={false} value={goal.amount} label="目标金额" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, amount } } }))} /><i>✓</i></label>
-          <label><span>希望什么时候准备好</span><input aria-label="目标日期" type="date" value={goal.deadline} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, deadline: event.target.value } } }))} /><i>✓</i></label>
+          <label><span>目标名称</span><input aria-label="目标名称" placeholder="Apple Watch" value={goal.name} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, name: event.target.value } } }))} />{goal.name.trim() && <i>✓</i>}</label>
+          <label><span>目标金额</span><AmountInput allowZero={false} emptyWhenZero placeholder="1500" value={goal.amount} label="目标金额" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, amount } } }))} />{goal.amount > 0 && amountValid && <i>✓</i>}</label>
+          <label><span>希望什么时候准备好</span><input aria-label="目标日期" type="date" placeholder="请选择日期" value={goal.deadline} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, deadline: event.target.value } } }))} />{goal.deadline && <i>✓</i>}</label>
         </div>
         <p className="hint centered">我会照顾好日常开销，再帮你判断这个时间是否合适。</p>
       </div>
@@ -365,7 +376,7 @@ function BalanceScreen({ state, update, daily = false, today }: ScreenProps & { 
   const dailyCheckIn = daily && !afterPurchase;
   const [amountValid, setAmountValid] = useState(true);
   function submit() {
-    const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
+    const previous = previousSnapshot(state, today);
     const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
     const snapshot = { date: today, balance: state.balance, effectiveSaved: result.effectiveSaved };
     update(draft => ({
@@ -473,18 +484,17 @@ function resultCopy(result: PurchaseEvaluation) {
   if (result.kind === "shortfall") return { title: "这笔消费会影响安排", kicker: `未来可能缺少 ${formatYuan(result.amount)}`, body: "建议降低预算，或等余额更充足时再购买。" };
   if (result.kind === "unknown") return { title: "现在还无法放心判断", kicker: "还缺少一些信息", body: `目前缺少${result.missing.join("、")}，暂时无法可靠计算这笔消费会带来多少影响。` };
   if (result.kind === "unreachable") return { title: "这笔消费会影响目标", kicker: "完成时间将无法确定", body: "按当前余额和计划，暂时无法可靠预测目标的完成日期。" };
-  if (result.kind === "progress-reduced") {
-    const dateCopy = result.baselineDate === result.scenarioDate
-      ? `预计完成日期仍是 ${formatChineseDate(result.scenarioDate)}。`
-      : `预计完成日期会从 ${formatChineseDate(result.baselineDate)} 调整到 ${formatChineseDate(result.scenarioDate)}。`;
-    return {
-      title: "这笔消费会影响目标",
-      kicker: `目标进度减少 ${formatYuan(result.amount)}`,
-      body: `购买后，已留金额将从 ${formatYuan(result.baselineSaved)} 变为 ${formatYuan(result.scenarioSaved)}。${dateCopy}`,
-    };
-  }
   if (result.kind === "no-impact") return { title: "可以安心购买", kicker: "这笔消费不会影响目标进度", body: "预计完成时间保持不变" };
-  return { title: "这笔消费会影响目标", kicker: `预计晚 ${result.delayDays} 天完成`, body: `完成时间将从 ${formatChineseDate(result.baselineDate)} 调整到 ${formatChineseDate(result.scenarioDate)}。` };
+  if (result.kind === "delayed-in-time") return {
+    title: "仍然可以购买",
+    kicker: `预计会推迟 ${result.delayDays} 天`,
+    body: `仍可在计划日期前完成，预计从 ${formatChineseDate(result.baselineDate)}调整到 ${formatChineseDate(result.scenarioDate)}。`,
+  };
+  return {
+    title: "这笔消费会让目标晚于计划",
+    kicker: `晚于计划 ${result.deadlineLateDays} 天`,
+    body: `完成时间将从 ${formatChineseDate(result.baselineDate)}调整到 ${formatChineseDate(result.scenarioDate)}，较当前预计晚 ${result.delayDays} 天。`,
+  };
 }
 
 function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: string }) {
@@ -493,7 +503,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
   const result = evaluatePurchase({ today, balance: state.balance, plan: state.plan, previous, ...purchase });
   const copy = resultCopy(result);
   const noImpact = result.kind === "no-impact";
-  const showAlternatives = result.kind === "progress-reduced" || result.kind === "delayed-in-time" || result.kind === "delayed";
+  const showAlternatives = result.kind === "delayed-in-time" || result.kind === "delayed";
   return (
     <Screen className="purchase-result-screen">
       <TopBar back backLabel="返回主页" onBack={() => go("home")} right={<span />} />
@@ -511,7 +521,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
         {showAlternatives && (
           <div className="panel alternatives">
             <div className="alternative-row"><span className="alternative-icon" aria-hidden="true"><Wallet size={28} weight="regular" /></span><div><span>降低预算</span><strong>今天最多花 {formatYuan(result.maxNoDelayAmount)}</strong><small>保持原来的完成时间</small></div></div>
-            <div className="alternative-row"><span className="alternative-icon" aria-hidden="true"><CalendarBlank size={28} weight="regular" /></span><div><span>延后购买</span><strong>{formatChineseDate(result.earliestNoDelayDate)}后购买</strong><small>保持原来的完成时间</small></div></div>
+            {result.earliestNoDelayDate && <div className="alternative-row"><span className="alternative-icon" aria-hidden="true"><CalendarBlank size={28} weight="regular" /></span><div><span>延后购买</span><strong>{formatChineseDate(result.earliestNoDelayDate)}后购买</strong><small>保持原来的完成时间</small></div></div>}
           </div>
         )}
         {noImpact && <PressableButton onClick={() => go("home")}>返回首页</PressableButton>}

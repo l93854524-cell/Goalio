@@ -3,6 +3,8 @@ import { cents, type Cents } from "@/lib/domain/money";
 import type { GoalioPlan } from "@/lib/domain/types";
 import { runSimulation } from "./simulator";
 
+export const SAFE_PURCHASE_SEARCH_DAYS = 365;
+
 export interface PurchaseInput {
   today: string;
   balance: Cents;
@@ -14,16 +16,15 @@ export interface PurchaseInput {
 
 type PurchaseKind =
   | { kind: "no-impact"; completionDate: string }
-  | { kind: "progress-reduced"; amount: Cents; baselineSaved: Cents; scenarioSaved: Cents; baselineDate: string; scenarioDate: string }
   | { kind: "delayed-in-time"; baselineDate: string; scenarioDate: string; delayDays: number; deadline: string }
-  | { kind: "delayed"; baselineDate: string; scenarioDate: string; delayDays: number }
+  | { kind: "delayed"; baselineDate: string; scenarioDate: string; delayDays: number; deadlineLateDays: number }
   | { kind: "shortfall"; amount: Cents }
   | { kind: "unknown"; missing: string[] }
   | { kind: "unreachable" };
 
 export type PurchaseEvaluation = PurchaseKind & {
   maxNoDelayAmount: Cents;
-  earliestNoDelayDate: string;
+  earliestNoDelayDate: string | null;
 };
 
 function projectedResult(input: PurchaseInput, amount: Cents, date: string) {
@@ -52,17 +53,17 @@ function maxNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: C
   return cents(low);
 }
 
-function earliestNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: Cents): string {
-  for (let offset = 0; offset <= 365; offset += 1) {
+function earliestNoDelay(input: PurchaseInput, baselineDate: string, baselineSaved: Cents): string | null {
+  for (let offset = 0; offset <= SAFE_PURCHASE_SEARCH_DAYS; offset += 1) {
     const date = addDays(input.today, offset);
     const result = projectedResult(input, input.amount, date);
     if (result?.status === "known" && result.completionDate !== null && result.completionDate <= baselineDate && result.effectiveSaved >= baselineSaved) return date;
   }
-  return addDays(input.today, 365);
+  return null;
 }
 
 export function evaluatePurchase(input: PurchaseInput): PurchaseEvaluation {
-  const fallback = { maxNoDelayAmount: cents(0), earliestNoDelayDate: input.today };
+  const fallback = { maxNoDelayAmount: cents(0), earliestNoDelayDate: null };
   if (input.amount > input.balance) {
     return { kind: "shortfall", amount: cents(input.amount - input.balance), ...fallback };
   }
@@ -98,22 +99,11 @@ export function evaluatePurchase(input: PurchaseInput): PurchaseEvaluation {
 
   const projected = projectedResult(input, input.amount, input.today);
   if (projected?.status === "unknown") return { kind: "unknown", missing: projected.missing, ...fallback };
-  if (!projected || !projected.completionDate) return { kind: "unreachable", ...fallback };
+  if (!projected || !projected.completionDate) return { kind: "unreachable", ...alternatives };
   const scenarioDate = projected.completionDate;
 
   const delayDays = Math.max(0, daysBetween(baseline.completionDate, scenarioDate));
 
-  if (scenario.effectiveSaved < baseline.effectiveSaved) {
-    return {
-      kind: "progress-reduced",
-      amount: cents(baseline.effectiveSaved - scenario.effectiveSaved),
-      baselineSaved: baseline.effectiveSaved,
-      scenarioSaved: scenario.effectiveSaved,
-      baselineDate: baseline.completionDate,
-      scenarioDate,
-      ...alternatives,
-    };
-  }
   if (delayDays === 0) return { kind: "no-impact", completionDate: baseline.completionDate, ...alternatives };
   if (scenarioDate <= input.plan.goal.deadline) {
     return {
@@ -125,5 +115,12 @@ export function evaluatePurchase(input: PurchaseInput): PurchaseEvaluation {
       ...alternatives,
     };
   }
-  return { kind: "delayed", baselineDate: baseline.completionDate, scenarioDate, delayDays, ...alternatives };
+  return {
+    kind: "delayed",
+    baselineDate: baseline.completionDate,
+    scenarioDate,
+    delayDays,
+    deadlineLateDays: Math.max(0, daysBetween(input.plan.goal.deadline, scenarioDate)),
+    ...alternatives,
+  };
 }

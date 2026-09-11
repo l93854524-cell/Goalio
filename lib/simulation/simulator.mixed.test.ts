@@ -25,16 +25,19 @@ function known(result: SimulationResult) {
 }
 
 describe("资金优先级", () => {
-  it("先保护未来必要支出，再把全部安全容量归入目标", () => {
+  it("先保护未来必要支出，再按当日节奏计入目标", () => {
     const result = known(runSimulation({
       today: "2026-01-01",
       balance: cents(5000),
-      plan: plan({ dailyFood: cents(100), goal: { name: "短期目标", amount: cents(10000), deadline: "2026-01-31" } }),
+      plan: plan({
+        expenses: [{ id: "rent", name: "房租", amount: cents(3000), cadence: "once", nextDate: "2026-01-02" }],
+        goal: { name: "短期目标", amount: cents(10000), deadline: "2026-01-31" },
+      }),
     }));
 
     expect(result.requiredReserve).toBe(cents(3000));
     expect(result.safeCapacity).toBe(cents(2000));
-    expect(result.effectiveSaved).toBe(cents(2000));
+    expect(result.effectiveSaved).toBe(cents(323));
   });
 
   it("余额增加不会减少目标分配或推迟完成日期", () => {
@@ -46,8 +49,9 @@ describe("资金优先级", () => {
     const high = known(runSimulation({ today: "2026-01-01", balance: cents(10000), plan: testPlan }));
 
     expect(high.effectiveSaved).toBeGreaterThanOrEqual(low.effectiveSaved);
-    expect(high.completionDate).toBe("2026-01-01");
-    expect(low.completionDate).toBe("2026-01-10");
+    expect(high.completionDate).not.toBeNull();
+    expect(low.completionDate).not.toBeNull();
+    expect(high.completionDate! <= low.completionDate!).toBe(true);
   });
 
   it("明日消费上限完整保护当前目标分配", () => {

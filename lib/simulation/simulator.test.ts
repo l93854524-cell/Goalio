@@ -19,79 +19,107 @@ function known(result: ReturnType<typeof runSimulation>) {
   return result;
 }
 
-describe("runSimulation envelope allocation", () => {
-  it("immediately funds a goal when current cash covers reserves and the full target", () => {
+describe("runSimulation paced allocation", () => {
+  it("limits a newly created goal to its first daily release even when the balance is high", () => {
     const result = known(runSimulation({
-      today: "2026-09-10",
-      balance: cents(2300000),
-      plan: plan({ goal: { name: "旅行", amount: cents(180000), deadline: "2026-09-10" } }),
-      previous: { date: "2026-09-10", effectiveSaved: cents(18500) },
+      today: "2026-01-01",
+      balance: cents(100000),
+      plan: plan({ goal: { name: "旅行", amount: cents(30000), deadline: "2026-01-30" } }),
     }));
 
     expect(result.requiredReserve).toBe(cents(0));
-    expect(result.safeCapacity).toBe(cents(180000));
-    expect(result.effectiveSaved).toBe(cents(180000));
-    expect(result.change).toBe(cents(161500));
-    expect(result.completionDate).toBe("2026-09-10");
+    expect(result.safeCapacity).toBe(cents(30000));
+    expect(result.effectiveSaved).toBe(cents(1000));
+    expect(result.change).toBe(cents(1000));
+    expect(result.completionDate).toBe("2026-01-30");
     expect(result.canMeetDeadline).toBe(true);
-    expect(result.tomorrowMaxSpend).toBe(cents(2120000));
+    expect(result.tomorrowMaxSpend).toBe(cents(70000));
   });
 
-  it("recalculates a same-day balance increase instead of freezing old progress", () => {
-    const result = known(runSimulation({
-      today: "2026-09-10",
-      balance: cents(90000),
-      plan: plan({ goal: { name: "旅行", amount: cents(100000), deadline: "2026-10-09" } }),
-      previous: { date: "2026-09-10", effectiveSaved: cents(10000) },
+  it("releases one additional paced amount on the next natural day", () => {
+    const testPlan = plan({ goal: { name: "旅行", amount: cents(30000), deadline: "2026-01-30" } });
+    const dayOne = known(runSimulation({ today: "2026-01-01", balance: cents(100000), plan: testPlan }));
+    const dayTwo = known(runSimulation({
+      today: "2026-01-02",
+      balance: cents(100000),
+      plan: testPlan,
+      previous: { date: "2026-01-01", effectiveSaved: dayOne.effectiveSaved },
     }));
 
-    expect(result.effectiveSaved).toBe(cents(90000));
-    expect(result.change).toBe(cents(80000));
+    expect(dayOne.effectiveSaved).toBe(cents(1000));
+    expect(dayTwo.effectiveSaved).toBe(cents(2000));
+    expect(dayTwo.change).toBe(cents(1000));
   });
 
-  it("derives allocation and completion from current inputs regardless of history", () => {
-    const current = {
-      today: "2026-09-10",
-      balance: cents(75000),
-      plan: plan({ goal: { name: "旅行", amount: cents(100000), deadline: "2026-10-09" } }),
-    };
-    const lowHistory = known(runSimulation({ ...current, previous: { date: "2026-09-10", effectiveSaved: cents(1000) } }));
-    const highHistory = known(runSimulation({ ...current, previous: { date: "2026-09-09", effectiveSaved: cents(95000) } }));
+  it("uses the latest same-day balance without granting a second daily release", () => {
+    const testPlan = plan({ goal: { name: "旅行", amount: cents(30000), deadline: "2026-01-30" } });
+    const previous = { date: "2026-01-01", effectiveSaved: cents(1000) };
+    const high = known(runSimulation({ today: "2026-01-02", balance: cents(100000), plan: testPlan, previous }));
+    const low = known(runSimulation({ today: "2026-01-02", balance: cents(1500), plan: testPlan, previous }));
+    const recovered = known(runSimulation({ today: "2026-01-02", balance: cents(100000), plan: testPlan, previous }));
 
-    expect(lowHistory.effectiveSaved).toBe(cents(75000));
-    expect(highHistory.effectiveSaved).toBe(cents(75000));
-    expect(lowHistory.completionDate).toBe(highHistory.completionDate);
-    expect(lowHistory.requiredReserve).toBe(highHistory.requiredReserve);
+    expect(high.effectiveSaved).toBe(cents(2000));
+    expect(low.effectiveSaved).toBe(cents(1500));
+    expect(recovered.effectiveSaved).toBe(cents(2000));
   });
 
-  it("projects completion to the first future date that fully funds the goal", () => {
+  it("returns a positive tomorrow extra-spend amount when the balance has room", () => {
     const result = known(runSimulation({
-      today: "2026-09-10",
-      balance: cents(50000),
+      today: "2026-01-01",
+      balance: cents(10000),
       plan: plan({
-        income: { cadence: "once", amount: cents(50000), nextDate: "2026-09-20" },
-        goal: { name: "旅行", amount: cents(100000), deadline: "2026-09-30" },
+        income: { cadence: "monthly", amount: cents(25000), nextDate: "2026-01-20" },
+        goal: { name: "旅行", amount: cents(30000), deadline: "2026-01-30" },
       }),
     }));
 
-    expect(result.effectiveSaved).toBe(cents(50000));
-    expect(result.completionDate).toBe("2026-09-20");
-    expect(result.canMeetDeadline).toBe(true);
+    expect(result.tomorrowMaxSpend).toBe(cents(5000));
   });
 
-  it("returns a future completion date while suppressing spending when the deadline is earlier", () => {
+  it("returns zero tomorrow extra-spend when all available cash is needed for the goal", () => {
     const result = known(runSimulation({
-      today: "2026-09-10",
-      balance: cents(50000),
-      plan: plan({
-        income: { cadence: "once", amount: cents(50000), nextDate: "2026-09-20" },
-        goal: { name: "旅行", amount: cents(100000), deadline: "2026-09-15" },
-      }),
+      today: "2026-01-01",
+      balance: cents(30000),
+      plan: plan({ goal: { name: "旅行", amount: cents(30000), deadline: "2026-01-30" } }),
     }));
 
-    expect(result.completionDate).toBe("2026-09-20");
-    expect(result.canMeetDeadline).toBe(false);
     expect(result.tomorrowMaxSpend).toBe(cents(0));
+  });
+
+  it("changes the projected completion date when fixed expenses change", () => {
+    const basePlan = plan({
+      income: { cadence: "monthly", amount: cents(10000), nextDate: "2026-01-05" },
+      goal: { name: "旅行", amount: cents(10000), deadline: "2026-01-10" },
+    });
+    const withoutExpense = known(runSimulation({ today: "2026-01-01", balance: cents(0), plan: basePlan }));
+    const withExpense = known(runSimulation({
+      today: "2026-01-01",
+      balance: cents(0),
+      plan: {
+        ...basePlan,
+        expenses: [{ id: "bill", name: "账单", amount: cents(5000), cadence: "once", nextDate: "2026-01-06" }],
+      },
+    }));
+
+    expect(withoutExpense.completionDate).toBe("2026-01-10");
+    expect(withExpense.completionDate).toBe("2026-02-05");
+  });
+
+  it("changes the projected completion date when future income amounts change", () => {
+    const goal = { name: "旅行", amount: cents(10000), deadline: "2026-01-10" };
+    const fullIncome = known(runSimulation({
+      today: "2026-01-01",
+      balance: cents(0),
+      plan: plan({ income: { cadence: "monthly", amount: cents(10000), nextDate: "2026-01-05" }, goal }),
+    }));
+    const halfIncome = known(runSimulation({
+      today: "2026-01-01",
+      balance: cents(0),
+      plan: plan({ income: { cadence: "monthly", amount: cents(5000), nextDate: "2026-01-05" }, goal }),
+    }));
+
+    expect(fullIncome.completionDate).toBe("2026-01-10");
+    expect(halfIncome.completionDate).toBe("2026-02-05");
   });
 
   it("keeps future data gaps explicit", () => {

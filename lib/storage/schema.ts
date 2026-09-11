@@ -40,7 +40,7 @@ export function createInitialState(): GoalioState {
       income: { cadence: "monthly", amount: cents(250000), nextDate: "2026-09-10" },
       dailyFood: cents(4000),
       expenses: [],
-      goal: { name: "一台新电脑", amount: cents(800000), deadline: "2026-12-20" },
+      goal: { name: "", amount: cents(0), deadline: "" },
     },
     balance: cents(126000),
     history: [],
