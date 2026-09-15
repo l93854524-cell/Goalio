@@ -54,7 +54,7 @@ export function AuthScreen({ onSignUp, onSignIn }: AuthScreenProps) {
       <header className="auth-brand" aria-label="Goalio">goalio</header>
       <section className="auth-copy">
         <p className="eyebrow">每天更新一次，就能一直看见目标</p>
-        <h1>{signingUp ? "创建你的账号" : "欢迎回来"}</h1>
+        <h1>{signingUp ? "建立你的 Goalio 账号" : "欢迎回来"}</h1>
         <p>登录状态会保留在这台设备上，你的进度也会同步保存。</p>
       </section>
 

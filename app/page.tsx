@@ -1,5 +1,5 @@
-import { GoalioApp } from "@/features/app/GoalioApp";
+import { GoalioAccountApp } from "@/features/account/GoalioAccountApp";
 
 export default function HomePage() {
-  return <GoalioApp />;
+  return <GoalioAccountApp />;
 }
