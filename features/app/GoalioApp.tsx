@@ -164,7 +164,7 @@ function InviteScreen({ go }: { go: (screen: ScreenName) => void }) {
           <span>邀请码</span>
           <input value={code} onChange={event => setCode(event.target.value.toUpperCase())} aria-label="邀请码" />
         </label>
-        <p className="privacy-note">邀请码会与当前设备绑定。你的余额、收入和支出只保存在这台设备上。</p>
+        <p className="privacy-note">邀请码目前用于演示。你的资料会保存到当前登录账号，并在这台设备保留缓存。</p>
       </div>
       <BottomActions primary="开始使用" onPrimary={() => code.trim() && go("income")} />
     </Screen>

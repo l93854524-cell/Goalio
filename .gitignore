@@ -5,4 +5,5 @@ out/
 .superpowers/
 output/
 *.log
+.env*.local
 .DS_Store
