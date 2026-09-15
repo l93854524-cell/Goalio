@@ -16,6 +16,25 @@ button, input { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 .app-shell { min-height: 100svh; }
 .screen { position: relative; width: min(100%, 430px); min-height: 100svh; margin: 0 auto; padding: max(28px, env(safe-area-inset-top)) 26px max(26px, env(safe-area-inset-bottom)); background: #fff; overflow: hidden; display: flex; flex-direction: column; }
+.auth-screen { justify-content: center; padding-block: max(38px, env(safe-area-inset-top)) max(34px, env(safe-area-inset-bottom)); overflow-y: auto; }
+.auth-brand { color: var(--ink); font-size: 44px; font-weight: 680; letter-spacing: -3.2px; line-height: 1; }
+.auth-copy { margin-top: 72px; }
+.auth-copy .eyebrow { margin: 0 0 16px; font-size: 15px; }
+.auth-copy h1 { margin: 0; font-size: 40px; letter-spacing: -.055em; }
+.auth-copy > p:last-child { margin: 18px 0 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
+.auth-form { display: grid; gap: 18px; margin-top: 38px; }
+.auth-form fieldset { display: grid; gap: 14px; margin: 0; padding: 0; border: 0; }
+.auth-field { display: grid; gap: 8px; color: #54545c; font-size: 14px; font-weight: 600; }
+.auth-field > input, .password-control { width: 100%; min-height: 54px; border: 1px solid var(--line); border-radius: 14px; background: #fafafc; transition: border-color 160ms, box-shadow 160ms; }
+.auth-field > input { padding: 0 16px; color: var(--ink); font-size: 17px; font-weight: 450; }
+.auth-field > input:focus, .password-control:focus-within { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,122,255,.07); }
+.password-control { display: grid; grid-template-columns: 1fr auto; align-items: center; overflow: hidden; }
+.password-control input { width: 100%; min-width: 0; height: 52px; padding: 0 12px 0 16px; border: 0; outline: 0; background: transparent; font-size: 17px; }
+.password-control button { min-width: 80px; min-height: 44px; margin-right: 5px; padding: 0 10px; border: 0; background: transparent; color: var(--blue); font-size: 14px; font-weight: 600; cursor: pointer; }
+.form-error { margin: -2px 2px 0; color: #c83030; font-size: 14px; line-height: 1.5; }
+.auth-form .pressable-button { min-height: 58px; margin-top: 4px; font-size: 18px; }
+.auth-switch { min-height: 44px; padding: 8px; border: 0; background: transparent; color: var(--blue); font-size: 16px; font-weight: 600; cursor: pointer; }
+.auth-switch:disabled { opacity: .5; cursor: default; }
 .screen-enter { animation: screen-in 340ms var(--ease-out) both; }
 @keyframes screen-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
 .topbar { min-height: 56px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; position: relative; z-index: 2; }
