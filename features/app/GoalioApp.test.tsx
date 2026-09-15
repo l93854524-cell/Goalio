@@ -433,6 +433,33 @@ describe("GoalioApp", () => {
     expect(screen.queryByText("明天额外最多可花")).not.toBeInTheDocument();
   });
 
+  it("keeps saved goal progress out of the tomorrow extra-spend amount", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
+    localStorage.setItem("goalio:v1", JSON.stringify({
+      version: 1,
+      screen: "home",
+      onboarded: true,
+      plan: {
+        income: { cadence: "weekly", amount: 150000, nextDate: "2026-09-12" },
+        dailyFood: 2000,
+        expenses: [
+          { id: "phone", name: "话费", amount: 10000, cadence: "monthly", nextDate: "2026-09-28" },
+        ],
+        goal: { name: "apple watch", amount: 150000, deadline: "2026-09-27" },
+      },
+      balance: 88000,
+      history: [],
+      lastResult: { date: "2026-09-06", balance: 88000, effectiveSaved: 28900 },
+      lastChange: 0,
+      purchase: null,
+    }));
+    render(<GoalioApp />);
+
+    expect(await screen.findByText("¥289", { selector: ".hero-amount" })).toBeVisible();
+    expect(screen.getByText("¥491", { selector: ".result-list strong" })).toBeVisible();
+    expect(screen.getByText(/不会动用已为目标留好的钱/)).toBeVisible();
+  });
+
   it("identifies a near-term reserve gap without claiming the cross-year goal will be late", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
     localStorage.setItem("goalio:v1", JSON.stringify({

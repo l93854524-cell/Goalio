@@ -463,7 +463,7 @@ function HomeScreen({ state, go, today }: ScreenProps & { today: string }) {
               {result.canMeetDeadline && <div><span>明天额外最多可花</span><strong>{formatYuan(result.tomorrowMaxSpend)}</strong></div>}
             </div>
             {result.canMeetDeadline ? (
-              <p className="spend-note">这个金额不包含明天的基本开销，并已确保按当前计划仍能在目标日期前准备好。实际余额或计划变化后会重新计算。</p>
+              <p className="spend-note">这个金额不包含明天的基本开销，不会动用已为目标留好的钱，并已确保按当前计划仍能在目标日期前准备好。实际余额或计划变化后会重新计算。</p>
             ) : reserveGap > 0 ? (
               <div className="deadline-adjustment">
                 <strong>近期基本开销还差 {formatYuan(reserveGap)}</strong>

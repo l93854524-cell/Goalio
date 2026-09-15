@@ -90,7 +90,6 @@ describe("runSimulation paced allocation", () => {
     const result = known(runSimulation({
       today: "2026-09-15",
       balance: cents(88000),
-      previous: { date: "2026-09-14", effectiveSaved: cents(70100) },
       plan: plan({
         income: { cadence: "weekly", amount: cents(50000), nextDate: "2026-09-18" },
         dailyFood: cents(2000),
@@ -103,7 +102,7 @@ describe("runSimulation paced allocation", () => {
     expect(result.tomorrowMaxSpend).toBe(cents(68000));
   });
 
-  it("never offers more extra spending than the current balance", () => {
+  it("caps extra spending below the current balance when some cash is already saved", () => {
     const result = known(runSimulation({
       today: "2026-01-01",
       balance: cents(88000),
@@ -113,7 +112,25 @@ describe("runSimulation paced allocation", () => {
       }),
     }));
 
-    expect(result.tomorrowMaxSpend).toBe(cents(88000));
+    expect(result.tomorrowMaxSpend).toBe(cents(87000));
+  });
+
+  it("does not offer goal progress as tomorrow extra spending", () => {
+    const result = known(runSimulation({
+      today: "2026-09-15",
+      balance: cents(88000),
+      previous: { date: "2026-09-15", effectiveSaved: cents(28900) },
+      plan: plan({
+        income: { cadence: "weekly", amount: cents(150000), nextDate: "2026-09-21" },
+        dailyFood: cents(2000),
+        expenses: [{ id: "phone", name: "话费", amount: cents(10000), cadence: "monthly", nextDate: "2026-09-28" }],
+        goal: { name: "apple watch", amount: cents(150000), deadline: "2026-10-06" },
+      }),
+    }));
+
+    expect(result.effectiveSaved).toBe(cents(28900));
+    expect(result.requiredReserve).toBe(cents(10000));
+    expect(result.tomorrowMaxSpend).toBe(cents(49100));
   });
 
   it("changes the projected completion date when fixed expenses change", () => {
