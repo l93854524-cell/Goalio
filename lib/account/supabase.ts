@@ -26,6 +26,7 @@ export function createSupabaseGateways(client: SupabaseClient): { auth: AuthGate
   const auth: AuthGateway = {
     async currentUser() {
       const { data, error } = await client.auth.getUser();
+      if (error?.name === "AuthSessionMissingError") return null;
       if (error) fail(error, "AUTH_SESSION_FAILED");
       return data.user ? accountUser(data.user) : null;
     },

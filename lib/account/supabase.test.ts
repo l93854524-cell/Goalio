@@ -6,6 +6,7 @@ import { createSupabaseGateways } from "./supabase";
 type FakeOptions = {
   row?: unknown;
   user?: { id: string; email: string; identities?: unknown[] } | null;
+  getUserError?: { name: string } | null;
   session?: object | null;
   onSignOut?: (options: { scope: "local" }) => void;
   onUpsert?: (payload: unknown) => void;
@@ -27,7 +28,7 @@ function fakeSupabase(options: FakeOptions = {}) {
   };
   return {
     auth: {
-      getUser: vi.fn(async () => ({ data: { user }, error: null })),
+      getUser: vi.fn(async () => ({ data: { user }, error: options.getUserError ?? null })),
       signUp: vi.fn(async () => ({ data: { user, session }, error: null })),
       signInWithPassword: vi.fn(async () => ({ data: { user, session }, error: null })),
       signOut: vi.fn(async (signOutOptions: { scope: "local" }) => {
@@ -43,6 +44,13 @@ function fakeSupabase(options: FakeOptions = {}) {
 }
 
 describe("Supabase account gateways", () => {
+  it("treats a missing browser session as signed out", async () => {
+    const client = fakeSupabase({ getUserError: { name: "AuthSessionMissingError" } });
+    const { auth } = createSupabaseGateways(client);
+
+    await expect(auth.currentUser()).resolves.toBeNull();
+  });
+
   it("signs out only the current device", async () => {
     const calls: unknown[] = [];
     const { auth } = createSupabaseGateways(fakeSupabase({ onSignOut: options => calls.push(options) }));
