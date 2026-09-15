@@ -206,18 +206,17 @@ function meetsDeadline(input: SimulationInput, result: KnownSimulation): boolean
     && result.completionDate <= input.plan.goal.deadline;
 }
 
-function maxSpendTomorrow(input: SimulationInput, protectedSaved: Cents, baseTimeline: SimulationTimeline): Cents {
+function maxSpendTomorrow(input: SimulationInput, baseTimeline: SimulationTimeline): Cents {
   const tomorrow = baseTimeline.dates[1];
-  const tomorrowFlow = baseTimeline.flows[1];
   let low = 0;
-  let high = Math.max(0, input.balance + Math.max(0, tomorrowFlow));
+  let high = Math.max(0, input.balance);
 
   while (low < high) {
     const mid = Math.ceil((low + high) / 2);
     const scenario = { ...input, scenarioPurchase: { date: tomorrow, amount: cents(mid) } };
     const timeline = timelineWithTomorrowPurchase(baseTimeline, scenario.scenarioPurchase.amount);
     const result = simulateKnown(scenario, timeline);
-    if (result.effectiveSaved >= protectedSaved && meetsDeadline(scenario, result)) low = mid;
+    if (meetsDeadline(scenario, result)) low = mid;
     else high = mid - 1;
   }
 
@@ -234,7 +233,7 @@ export function runSimulation(input: SimulationInput): SimulationResult {
   const result = simulateKnown(input, timeline);
   const canMeetDeadline = meetsDeadline(input, result);
   const tomorrowMaxSpend = !input.scenarioPurchase && canMeetDeadline
-    ? maxSpendTomorrow(input, result.effectiveSaved, timeline)
+    ? maxSpendTomorrow(input, timeline)
     : cents(0);
 
   return {

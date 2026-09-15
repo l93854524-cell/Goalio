@@ -36,9 +36,11 @@ export function addMonths(iso: string, months: number): string {
   return toISO(new Date(Date.UTC(year, month, Math.min(source.getUTCDate(), lastDay))));
 }
 
-export function formatChineseDate(iso: string): string {
+export function formatChineseDate(iso: string, referenceIso?: string): string {
   const date = utcDate(iso);
-  return `${date.getUTCMonth() + 1} 月 ${date.getUTCDate()} 日`;
+  const compact = `${date.getUTCMonth() + 1} 月 ${date.getUTCDate()} 日`;
+  if (!referenceIso || date.getUTCFullYear() === utcDate(referenceIso).getUTCFullYear()) return compact;
+  return `${date.getUTCFullYear()} 年 ${compact}`;
 }
 
 export function formatChineseFullDate(iso: string): string {

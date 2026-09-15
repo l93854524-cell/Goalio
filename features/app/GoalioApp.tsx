@@ -436,6 +436,9 @@ function HomeScreen({ state, go, today }: ScreenProps & { today: string }) {
   const saved = result.effectiveSaved;
   const progress = Math.min(100, Math.round((saved / state.plan.goal.amount) * 1000) / 10);
   const change = state.lastChange ?? result.change;
+  const reserveGap = result.status === "known"
+    ? cents(Math.max(0, result.requiredReserve - state.balance))
+    : cents(0);
   return (
     <Screen>
       <TopBar
@@ -455,12 +458,17 @@ function HomeScreen({ state, go, today }: ScreenProps & { today: string }) {
         {result.status === "known" ? (
           <div className="reveal-2">
             <div className="result-list">
-              <div><span>预计准备好</span><strong>{result.completionDate ? formatChineseDate(result.completionDate) : "暂时未知"}</strong></div>
+              <div><span>预计准备好</span><strong>{result.completionDate ? formatChineseDate(result.completionDate, today) : "暂时未知"}</strong></div>
               <div><span>明天的基本开销</span><strong>{formatYuan(result.tomorrowFood)}</strong></div>
               {result.canMeetDeadline && <div><span>明天额外最多可花</span><strong>{formatYuan(result.tomorrowMaxSpend)}</strong></div>}
             </div>
             {result.canMeetDeadline ? (
-              <p className="spend-note">这个金额不包含明天的基本开销，也不会动用已为目标留好的钱。实际余额或计划变化后会重新计算。</p>
+              <p className="spend-note">这个金额不包含明天的基本开销，并已确保按当前计划仍能在目标日期前准备好。实际余额或计划变化后会重新计算。</p>
+            ) : reserveGap > 0 ? (
+              <div className="deadline-adjustment">
+                <strong>近期基本开销还差 {formatYuan(reserveGap)}</strong>
+                <p>按现在的余额，下一笔收入到账前的生活和固定支出还需要补足。</p>
+              </div>
             ) : (
               <div className="deadline-adjustment">
                 <strong>当前的安排还需要一点调整</strong>
@@ -496,7 +504,7 @@ function PurchaseInputScreen({ state, update, go }: ScreenProps) {
   );
 }
 
-function resultCopy(result: PurchaseEvaluation) {
+function resultCopy(result: PurchaseEvaluation, today: string) {
   if (result.kind === "shortfall") return { title: "这笔消费会影响安排", kicker: `未来可能缺少 ${formatYuan(result.amount)}`, body: "建议降低预算，或等余额更充足时再购买。" };
   if (result.kind === "unknown") return { title: "现在还无法放心判断", kicker: "还缺少一些信息", body: `目前缺少${result.missing.join("、")}，暂时无法可靠计算这笔消费会带来多少影响。` };
   if (result.kind === "unreachable") return { title: "这笔消费会影响目标", kicker: "完成时间将无法确定", body: "按当前余额和计划，暂时无法可靠预测目标的完成日期。" };
@@ -504,12 +512,12 @@ function resultCopy(result: PurchaseEvaluation) {
   if (result.kind === "delayed-in-time") return {
     title: "仍然可以购买",
     kicker: `预计会推迟 ${result.delayDays} 天`,
-    body: `仍可在计划日期前完成，预计从 ${formatChineseDate(result.baselineDate)}调整到 ${formatChineseDate(result.scenarioDate)}。`,
+    body: `仍可在计划日期前完成，预计从 ${formatChineseDate(result.baselineDate, today)}调整到 ${formatChineseDate(result.scenarioDate, today)}。`,
   };
   return {
     title: "这笔消费会让目标晚于计划",
     kicker: `晚于计划 ${result.deadlineLateDays} 天`,
-    body: `完成时间将从 ${formatChineseDate(result.baselineDate)}调整到 ${formatChineseDate(result.scenarioDate)}，较当前预计晚 ${result.delayDays} 天。`,
+    body: `完成时间将从 ${formatChineseDate(result.baselineDate, today)}调整到 ${formatChineseDate(result.scenarioDate, today)}，较当前预计晚 ${result.delayDays} 天。`,
   };
 }
 
@@ -517,7 +525,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
   const purchase = state.purchase ?? { name: "耳机", amount: cents(119900) };
   const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
   const result = evaluatePurchase({ today, balance: state.balance, plan: state.plan, previous, ...purchase });
-  const copy = resultCopy(result);
+  const copy = resultCopy(result, today);
   const noImpact = result.kind === "no-impact";
   const showAlternatives = result.kind === "delayed-in-time" || result.kind === "delayed";
   return (
@@ -537,7 +545,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
         {showAlternatives && (
           <div className="panel alternatives">
             <div className="alternative-row"><span className="alternative-icon" aria-hidden="true"><Wallet size={28} weight="regular" /></span><div><span>降低预算</span><strong>今天最多花 {formatYuan(result.maxNoDelayAmount)}</strong><small>保持原来的完成时间</small></div></div>
-            {result.earliestNoDelayDate && <div className="alternative-row"><span className="alternative-icon" aria-hidden="true"><CalendarBlank size={28} weight="regular" /></span><div><span>延后购买</span><strong>{formatChineseDate(result.earliestNoDelayDate)}后购买</strong><small>保持原来的完成时间</small></div></div>}
+            {result.earliestNoDelayDate && <div className="alternative-row"><span className="alternative-icon" aria-hidden="true"><CalendarBlank size={28} weight="regular" /></span><div><span>延后购买</span><strong>{formatChineseDate(result.earliestNoDelayDate, today)}后购买</strong><small>保持原来的完成时间</small></div></div>}
           </div>
         )}
         {noImpact && <PressableButton onClick={() => go("home")}>返回首页</PressableButton>}
@@ -555,10 +563,10 @@ function SettingsScreen({ state, go, today }: ScreenProps & { today: string }) {
       <header className="modal-header"><IconButton label="关闭设置" onClick={() => go("home")}>×</IconButton><h1>设置</h1><span /></header>
       <div className="content settings-content">
         <div className="settings-list">
-          <button onClick={() => go("income")}><strong>未来收入</strong><span>{income && incomeDate ? `${cadenceLabel(income.cadence)} ${formatYuan(income.amount)} · 下次 ${formatChineseDate(incomeDate)}到账` : "尚未填写"}</span><b>›</b></button>
+          <button onClick={() => go("income")}><strong>未来收入</strong><span>{income && incomeDate ? `${cadenceLabel(income.cadence)} ${formatYuan(income.amount)} · 下次 ${formatChineseDate(incomeDate, today)}到账` : "尚未填写"}</span><b>›</b></button>
           <button onClick={() => go("food")}><strong>每天的基本饮食</strong><span>{formatYuan(state.plan.dailyFood)}</span><b>›</b></button>
           <button onClick={() => go("settings-expenses")}><strong>固定支出</strong><span>{state.plan.expenses.length} 笔 · 每月 {formatYuan(cents(state.plan.expenses.reduce((sum, item) => sum + item.amount, 0)))}</span><b>›</b></button>
-          <button onClick={() => go("goal")}><strong>当前目标</strong><span>{state.plan.goal.name} · {formatYuan(state.plan.goal.amount)} · {formatChineseDate(state.plan.goal.deadline)}</span><b>›</b></button>
+          <button onClick={() => go("goal")}><strong>当前目标</strong><span>{state.plan.goal.name} · {formatYuan(state.plan.goal.amount)} · {formatChineseDate(state.plan.goal.deadline, today)}</span><b>›</b></button>
         </div>
         <button className="text-button standalone" onClick={() => go("income")}>重新安排</button>
         <div className="data-note"><h2>你的数据</h2><p>余额、收入、支出和目标只保存在这台设备上。</p></div>

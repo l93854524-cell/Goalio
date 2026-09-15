@@ -162,7 +162,7 @@ describe("GoalioApp", () => {
     expect(await screen.findByText("已为目标留好", { selector: ".metric-label" })).toBeVisible();
     expect(screen.getByText(/今天多留了/)).toBeVisible();
     expect(screen.getByText("明天额外最多可花")).toBeVisible();
-    expect(screen.getByText(/不会动用已为目标留好的钱/)).toBeVisible();
+    expect(screen.getByText(/仍能在目标日期前准备好/)).toBeVisible();
   });
 
   it("opens purchase evaluation from the home result", async () => {
@@ -430,6 +430,37 @@ describe("GoalioApp", () => {
 
     expect(await screen.findByText("当前的安排还需要一点调整")).toBeVisible();
     expect(screen.getByText(/目标时间可能会晚一些/)).toBeVisible();
+    expect(screen.queryByText("明天额外最多可花")).not.toBeInTheDocument();
+  });
+
+  it("identifies a near-term reserve gap without claiming the cross-year goal will be late", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
+    localStorage.setItem("goalio:v1", JSON.stringify({
+      version: 1,
+      screen: "home",
+      onboarded: true,
+      plan: {
+        income: { cadence: "weekly", amount: 50000, nextDate: "2026-09-14" },
+        dailyFood: 2000,
+        expenses: [
+          { id: "phone", name: "手机话费", amount: 10000, cadence: "monthly", nextDate: "2026-09-28" },
+        ],
+        goal: { name: "apple watch S11", amount: 150000, deadline: "2027-10-06" },
+      },
+      balance: 4000,
+      history: [],
+      lastResult: { date: "2026-09-06", balance: 36300, effectiveSaved: 32300 },
+      lastChange: -32300,
+      purchase: null,
+    }));
+    const user = userEvent.setup();
+    render(<GoalioApp />);
+
+    await user.click(await screen.findByRole("button", { name: "后一天" }));
+    await user.click(await screen.findByRole("button", { name: "更新余额" }));
+    expect(await screen.findByText("2027 年 10 月 6 日", { selector: ".result-list strong" })).toBeVisible();
+    expect(screen.getByText("近期基本开销还差 ¥80")).toBeVisible();
+    expect(screen.queryByText(/目标时间可能会晚一些/)).not.toBeInTheDocument();
     expect(screen.queryByText("明天额外最多可花")).not.toBeInTheDocument();
   });
 

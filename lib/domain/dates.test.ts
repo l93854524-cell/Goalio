@@ -10,4 +10,12 @@ describe("calendar dates", () => {
   it("formats a compact Chinese date", () => {
     expect(formatChineseDate("2026-12-20")).toBe("12 月 20 日");
   });
+
+  it("keeps dates compact when they are in the reference year", () => {
+    expect(formatChineseDate("2026-12-20", "2026-09-07")).toBe("12 月 20 日");
+  });
+
+  it("adds the year when the date is outside the reference year", () => {
+    expect(formatChineseDate("2027-10-06", "2026-09-07")).toBe("2027 年 10 月 6 日");
+  });
 });

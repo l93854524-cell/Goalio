@@ -86,6 +86,36 @@ describe("runSimulation paced allocation", () => {
     expect(result.tomorrowMaxSpend).toBe(cents(0));
   });
 
+  it("matches the deadline ledger while preserving cash needed before each income", () => {
+    const result = known(runSimulation({
+      today: "2026-09-15",
+      balance: cents(88000),
+      previous: { date: "2026-09-14", effectiveSaved: cents(70100) },
+      plan: plan({
+        income: { cadence: "weekly", amount: cents(50000), nextDate: "2026-09-18" },
+        dailyFood: cents(2000),
+        expenses: [{ id: "bill", name: "固定支出", amount: cents(10000), cadence: "once", nextDate: "2026-10-01" }],
+        goal: { name: "目标", amount: cents(150000), deadline: "2026-10-10" },
+      }),
+    }));
+
+    // 880 + 2,000 income - 500 food - 100 bill - 1,500 goal - 100 post-deadline reserve.
+    expect(result.tomorrowMaxSpend).toBe(cents(68000));
+  });
+
+  it("never offers more extra spending than the current balance", () => {
+    const result = known(runSimulation({
+      today: "2026-01-01",
+      balance: cents(88000),
+      plan: plan({
+        income: { cadence: "once", amount: cents(300000), nextDate: "2026-01-02" },
+        goal: { name: "目标", amount: cents(10000), deadline: "2026-01-10" },
+      }),
+    }));
+
+    expect(result.tomorrowMaxSpend).toBe(cents(88000));
+  });
+
   it("changes the projected completion date when fixed expenses change", () => {
     const basePlan = plan({
       income: { cadence: "monthly", amount: cents(10000), nextDate: "2026-01-05" },
