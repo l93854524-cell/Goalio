@@ -51,6 +51,19 @@ describe("GoalioApp", () => {
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
+  it("does not offer invite-code access on the welcome screen", () => {
+    renderGoalio();
+
+    expect(screen.queryByRole("button", { name: "已有邀请码？" })).not.toBeInTheDocument();
+  });
+
+  it("recovers a legacy invite screen at the welcome screen", () => {
+    renderGoalio({ initialState: { ...createInitialState(), screen: "invite" } });
+
+    expect(screen.getByRole("heading", { name: /把今天的余额/ })).toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "邀请码" })).not.toBeInTheDocument();
+  });
+
   it("shows the signed-in email and retries a failed sync", async () => {
     const user = userEvent.setup();
     const onRetrySync = vi.fn();

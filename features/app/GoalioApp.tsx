@@ -145,28 +145,7 @@ function WelcomeScreen({ go }: { go: (screen: ScreenName) => void }) {
         <h1>把今天的余额，<br />变成更安心的决定。</h1>
         <p>每天更新一次，Goalio 会告诉你已经安全攒下多少，以及一笔消费会让目标延后多久。</p>
         <FeedbackButton onDone={() => go("income")}>开始设置</FeedbackButton>
-        <button className="text-button" onClick={() => go("invite")}>已有邀请码？</button>
       </section>
-    </Screen>
-  );
-}
-
-function InviteScreen({ go }: { go: (screen: ScreenName) => void }) {
-  const [code, setCode] = useState("GOALIO");
-  return (
-    <Screen>
-      <TopBar back onBack={() => go("welcome")} right={<span />} />
-      <div className="content intro-content">
-        <p className="eyebrow">内部体验</p>
-        <h1>欢迎来到 Goalio</h1>
-        <p className="lead">输入邀请码后，我会帮你照看每天的生活开销，也陪你慢慢靠近想要的目标。</p>
-        <label className="field-card">
-          <span>邀请码</span>
-          <input value={code} onChange={event => setCode(event.target.value.toUpperCase())} aria-label="邀请码" />
-        </label>
-        <p className="privacy-note">邀请码目前用于演示。你的资料会保存到当前登录账号，并在这台设备保留缓存。</p>
-      </div>
-      <BottomActions primary="开始使用" onPrimary={() => code.trim() && go("income")} />
     </Screen>
   );
 }
@@ -659,7 +638,7 @@ export function GoalioApp({ initialState, onStateChange, account }: GoalioAppPro
   let view: ReactNode;
   switch (state.screen) {
     case "welcome": view = <WelcomeScreen go={go} />; break;
-    case "invite": view = <InviteScreen go={go} />; break;
+    case "invite": view = <WelcomeScreen go={go} />; break;
     case "income": view = <IncomeScreen {...props} />; break;
     case "food": view = <FoodScreen {...props} />; break;
     case "expenses": view = <ExpensesScreen {...props} today={today} />; break;
