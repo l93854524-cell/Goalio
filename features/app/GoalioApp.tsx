@@ -101,12 +101,12 @@ function AmountInput({ value, onChange, onValidityChange, label, allowZero = tru
   );
 }
 
-function MoneyField({ value, onChange, onValidityChange, label, large = false, autoFocus = false }: { value: Cents; onChange: (value: Cents) => void; onValidityChange?: (valid: boolean) => void; label: string; large?: boolean; autoFocus?: boolean }) {
+function MoneyField({ value, onChange, onValidityChange, label, large = false, autoFocus = false, allowZero = true, placeholder, emptyWhenZero = false }: { value: Cents; onChange: (value: Cents) => void; onValidityChange?: (valid: boolean) => void; label: string; large?: boolean; autoFocus?: boolean; allowZero?: boolean; placeholder?: string; emptyWhenZero?: boolean }) {
   return (
     <label className={`money-field ${large ? "money-field-large" : ""}`}>
       <span className="sr-only">{label}</span>
       <span className="currency">¥</span>
-      <AmountInput value={value} onChange={onChange} onValidityChange={onValidityChange} label={label} autoFocus={autoFocus} selectOnFocus />
+      <AmountInput value={value} onChange={onChange} onValidityChange={onValidityChange} label={label} autoFocus={autoFocus} selectOnFocus allowZero={allowZero} placeholder={placeholder} emptyWhenZero={emptyWhenZero} />
     </label>
   );
 }
@@ -173,11 +173,11 @@ function InviteScreen({ go }: { go: (screen: ScreenName) => void }) {
 
 function IncomeScreen({ state, update, go }: ScreenProps) {
   const income = state.plan.income;
-  const selected = income?.cadence ?? "monthly";
-  const [amountValid, setAmountValid] = useState(income !== null);
+  const selected = income?.cadence ?? null;
+  const [amountValid, setAmountValid] = useState((income?.amount ?? 0) > 0);
   return (
     <Screen>
-      <TopBar right={<StepMark step={1} />} />
+      <TopBar back onBack={() => go(state.onboarded ? "settings" : "welcome")} right={<StepMark step={1} />} />
       <div className="content">
         <h1>生活费通常<br />什么时候到账？</h1>
         <p className="lead">告诉我已经确定的收入安排，<br />我会据此照看之后的日常开销。</p>
@@ -187,8 +187,9 @@ function IncomeScreen({ state, update, go }: ScreenProps) {
               key={option.value}
               className={`choice-row ${selected === option.value ? "selected" : ""}`}
               onClick={() => {
-                setAmountValid(true);
-                update(draft => ({ ...draft, plan: { ...draft.plan, income: { cadence: option.value, amount: income?.amount ?? cents(250000), nextDate: income?.nextDate ?? "2026-09-10" } } }));
+                const amount = income?.amount ?? cents(0);
+                setAmountValid(amount > 0);
+                update(draft => ({ ...draft, plan: { ...draft.plan, income: { cadence: option.value, amount, nextDate: income?.nextDate ?? "" } } }));
               }}
             >
               <span>{option.label}</span>
@@ -196,7 +197,7 @@ function IncomeScreen({ state, update, go }: ScreenProps) {
           ))}
           {income && (
             <div className="detail-group">
-              <label><span>每次到账金额</span><AmountInput value={income.amount} label="每次到账金额" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, plan: { ...draft.plan, income: { ...income, amount } } }))} /></label>
+              <label><span>每次到账金额</span><AmountInput emptyWhenZero placeholder="2000" value={income.amount} label="每次到账金额" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, plan: { ...draft.plan, income: { ...income, amount } } }))} /></label>
               <label><span>下一次到账</span><input aria-label="下一次到账" type="date" value={income.nextDate} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, income: { ...income, nextDate: event.target.value } } }))} /></label>
             </div>
           )}
@@ -208,14 +209,14 @@ function IncomeScreen({ state, update, go }: ScreenProps) {
 }
 
 function FoodScreen({ state, update, go }: ScreenProps) {
-  const [amountValid, setAmountValid] = useState(true);
+  const [amountValid, setAmountValid] = useState(state.plan.dailyFood > 0);
   return (
     <Screen>
-      <TopBar right={<StepMark step={2} />} />
+      <TopBar back onBack={() => go("income")} right={<StepMark step={2} />} />
       <div className="content">
         <h1>每天需要为吃饭留出多少？</h1>
         <p className="lead">填写一个适合日常生活的金额。<br />我会每天优先把这部分照顾好。</p>
-        <MoneyField large value={state.plan.dailyFood} label="每日基本饮食金额" onValidityChange={setAmountValid} onChange={dailyFood => update(draft => ({ ...draft, plan: { ...draft.plan, dailyFood } }))} />
+        <MoneyField large emptyWhenZero placeholder="40" value={state.plan.dailyFood} label="每日基本饮食金额" onValidityChange={setAmountValid} onChange={dailyFood => update(draft => ({ ...draft, plan: { ...draft.plan, dailyFood } }))} />
         <div className="quick-options">
           {[3000, 4000, 5000].map(value => <button className={state.plan.dailyFood === value ? "active" : ""} key={value} onClick={() => { setAmountValid(true); update(draft => ({ ...draft, plan: { ...draft.plan, dailyFood: cents(value) } })); }}>¥{value / 100}</button>)}
         </div>
@@ -258,7 +259,7 @@ function ExpensesScreen({ state, update, go, today }: ScreenProps & { today: str
   const [editingId, setEditingId] = useState<string | null>();
   const [name, setName] = useState("");
   const [amountText, setAmountText] = useState("");
-  const [nextDate, setNextDate] = useState("2026-09-28");
+  const [nextDate, setNextDate] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const editing = editingId !== undefined;
   const amount = parseYuan(amountText);
@@ -267,7 +268,7 @@ function ExpensesScreen({ state, update, go, today }: ScreenProps & { today: str
   function startExpense() {
     setName("");
     setAmountText("");
-    setNextDate("2026-09-28");
+    setNextDate("");
     setConfirmingDelete(false);
     setEditingId(null);
   }
@@ -312,8 +313,8 @@ function ExpensesScreen({ state, update, go, today }: ScreenProps & { today: str
     const isExisting = typeof editingId === "string";
     return (
       <div className="expense-editor">
-        <label><span>名称</span><input autoFocus aria-label="支出名称" placeholder="例如：手机话费" value={name} onChange={event => setName(event.target.value)} /></label>
-        <label><span>金额</span><input aria-label="支出金额" inputMode="decimal" placeholder="0" value={amountText} onChange={event => setAmountText(event.target.value)} /></label>
+        <label><span>名称</span><input autoFocus aria-label="支出名称" placeholder="手机套餐" value={name} onChange={event => setName(event.target.value)} /></label>
+        <label><span>金额</span><input aria-label="支出金额" inputMode="decimal" placeholder="50" value={amountText} onChange={event => setAmountText(event.target.value)} /></label>
         <label><span>下次扣款</span><input aria-label="下次扣款日期" type="date" value={nextDate} onChange={event => setNextDate(event.target.value)} /></label>
         {confirmingDelete ? (
           <div className="expense-delete-confirm" role="group" aria-label="删除固定支出确认">
@@ -337,16 +338,15 @@ function ExpensesScreen({ state, update, go, today }: ScreenProps & { today: str
     <Screen>
       {fromSettings
         ? <TopBar back onBack={() => go("settings")} right={<span />} />
-        : <TopBar right={<StepMark step={3} />} />}
+        : <TopBar back onBack={() => go("food")} right={<StepMark step={3} />} />}
       <div className="content">
         <h1>还有哪些已经确定的开销？</h1>
-        <p className="lead">比如房租、会员订阅、学费，或者已经决定要支付的费用。我会提前为它们留好位置。</p>
+        <p className="lead">填写每月固定会发生的支出，我会提前为它们留好位置。</p>
         <div className="panel expense-panel">
           {state.plan.expenses.length === 0 && !editing && (
             <button className="expense-examples" aria-label="填写自己的固定支出" onClick={startExpense}>
-              <span className="summary-row"><strong>房租</strong><span>¥1,800 · 每月 5 日</span></span>
-              <span className="summary-row"><strong>视频会员</strong><span>¥25 · 每月 18 日</span></span>
-              <small>示例 · 点击后填写自己的开销</small>
+              <strong>手机套餐、会员订阅、校园网费等</strong>
+              <small>点击后填写你的固定支出</small>
             </button>
           )}
           {state.plan.expenses.map(expense => editingId === expense.id
@@ -373,8 +373,8 @@ function GoalScreen({ state, update, go, today }: ScreenProps & { today: string 
         <h1>最近想为哪件事慢慢攒钱？</h1>
         <p className="lead">一次专注一个目标，会更容易看清每天的进展。</p>
         <div className="panel detail-group goal-fields">
-          <label><span>目标名称</span><input aria-label="目标名称" placeholder="Apple Watch" value={goal.name} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, name: event.target.value } } }))} />{goal.name.trim() && <i>✓</i>}</label>
-          <label><span>目标金额</span><AmountInput allowZero={false} emptyWhenZero placeholder="1500" value={goal.amount} label="目标金额" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, amount } } }))} />{goal.amount > 0 && amountValid && <i>✓</i>}</label>
+          <label><span>目标名称</span><input aria-label="目标名称" placeholder="毕业旅行" value={goal.name} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, name: event.target.value } } }))} />{goal.name.trim() && <i>✓</i>}</label>
+          <label><span>目标金额</span><AmountInput allowZero={false} emptyWhenZero placeholder="2500" value={goal.amount} label="目标金额" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, amount } } }))} />{goal.amount > 0 && amountValid && <i>✓</i>}</label>
           <label><span>希望什么时候准备好</span><input aria-label="目标日期" type="date" placeholder="请选择日期" value={goal.deadline} onChange={event => update(draft => ({ ...draft, plan: { ...draft.plan, goal: { ...goal, deadline: event.target.value } } }))} />{goal.deadline && <i>✓</i>}</label>
         </div>
         <p className="hint centered">我会照顾好日常开销，再帮你判断这个时间是否合适。</p>
@@ -387,10 +387,10 @@ function GoalScreen({ state, update, go, today }: ScreenProps & { today: string 
   );
 }
 
-function BalanceScreen({ state, update, daily = false, today }: ScreenProps & { daily?: boolean; today: string }) {
+function BalanceScreen({ state, update, go, daily = false, today }: ScreenProps & { daily?: boolean; today: string }) {
   const afterPurchase = state.screen === "post-purchase";
   const dailyCheckIn = daily && !afterPurchase;
-  const [amountValid, setAmountValid] = useState(true);
+  const [amountValid, setAmountValid] = useState(daily || state.balance > 0);
   function submit() {
     const previous = previousSnapshot(state, today);
     const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
@@ -406,12 +406,12 @@ function BalanceScreen({ state, update, daily = false, today }: ScreenProps & { 
   }
   return (
     <Screen className={dailyCheckIn ? "daily-checkin-screen" : ""}>
-      <TopBar right={daily ? <DailyDate date={today} /> : <span className="date-label">最后一步</span>} />
+      <TopBar back={!daily} onBack={() => go("goal")} right={daily ? <DailyDate date={today} /> : <span className="date-label">最后一步</span>} />
       <div className={`content balance-content ${dailyCheckIn ? "daily-checkin-content" : ""}`}>
         {dailyCheckIn && <p className="daily-kicker"><span />每日更新</p>}
         <h1>{afterPurchase ? "购买完成后的余额是多少？" : dailyCheckIn ? "今天手上还有多少？" : "最后，告诉我现在有多少钱"}</h1>
         <p className="lead">{afterPurchase ? "请填写购买完成后的最新真实余额，消费金额已经包含在这个数字里。" : dailyCheckIn ? "昨天的余额已经放好了。确认一下今天的数字，我会重新照看接下来的安排。" : "请填写此刻可以用于日常生活和这个目标的真实余额。今天已经发生的收入和支出，都算在这个数字里。"}</p>
-        <MoneyField autoFocus={dailyCheckIn} large value={state.balance} label="当前真实余额" onValidityChange={setAmountValid} onChange={balance => update(draft => ({ ...draft, balance }))} />
+        <MoneyField autoFocus={dailyCheckIn} large emptyWhenZero={!daily} placeholder={!daily ? "5200" : undefined} value={state.balance} label="当前真实余额" onValidityChange={setAmountValid} onChange={balance => update(draft => ({ ...draft, balance }))} />
         {dailyCheckIn && <p className="prefill-note">已带入上次余额，输入时会自动全选</p>}
         <div className="privacy-lock"><span aria-hidden="true">▣</span><p>数据会加密传输并保存到你的 Goalio 账号，当前设备也会保留缓存。<br />我不会从余额中实际转走任何钱。</p></div>
       </div>
@@ -494,8 +494,8 @@ function PurchaseInputScreen({ state, update, go }: ScreenProps) {
         <h1>最近有想买的东西吗？</h1>
         <p className="lead centered">告诉我金额，<br />我帮你看看它会不会影响现在的生活和目标。</p>
         <div className="panel detail-group purchase-fields">
-          <label><span>想买什么</span><input aria-label="想买什么" placeholder="例如：聚餐" value={purchase.name} onChange={event => update(draft => ({ ...draft, purchase: { ...purchase, name: event.target.value } }))} /></label>
-          <label><span>需要多少钱</span><AmountInput allowZero={false} emptyWhenZero placeholder="例如：65" value={purchase.amount} label="需要多少钱" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, purchase: { ...purchase, amount } }))} /></label>
+          <label><span>想买什么</span><input aria-label="想买什么" placeholder="降噪耳机" value={purchase.name} onChange={event => update(draft => ({ ...draft, purchase: { ...purchase, name: event.target.value } }))} /></label>
+          <label><span>需要多少钱</span><AmountInput allowZero={false} emptyWhenZero placeholder="600" value={purchase.amount} label="需要多少钱" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, purchase: { ...purchase, amount } }))} /></label>
         </div>
         <p className="hint centered">我会把这笔消费放进未来的安排里重新计算。</p>
       </div>

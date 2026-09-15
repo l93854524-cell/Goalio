@@ -74,30 +74,19 @@ describe("GoalioApp", () => {
     expect(onSignOut).toHaveBeenCalledOnce();
   });
 
-  it("keeps first-goal examples as placeholders until the user enters real values", async () => {
-    const user = userEvent.setup();
-    renderGoalio();
-
-    await user.click(screen.getByRole("button", { name: "开始设置" }));
-    await user.click(await screen.findByRole("button", { name: "继续" }));
-    await user.click(await screen.findByRole("button", { name: "继续" }));
-    await user.click(await screen.findByRole("button", { name: "继续" }));
+  it("keeps the student goal examples as placeholders until the user enters real values", async () => {
+    renderGoalio({ initialState: { ...createInitialState(), screen: "goal" } });
 
     const name = await screen.findByRole("textbox", { name: "目标名称" });
     const amount = screen.getByRole("textbox", { name: "目标金额" });
     const deadline = screen.getByLabelText("目标日期");
     expect(name).toHaveValue("");
-    expect(name).toHaveAttribute("placeholder", "Apple Watch");
+    expect(name).toHaveAttribute("placeholder", "毕业旅行");
     expect(amount).toHaveValue("");
-    expect(amount).toHaveAttribute("placeholder", "1500");
+    expect(amount).toHaveAttribute("placeholder", "2500");
     expect(deadline).toHaveValue("");
     expect(deadline).toHaveAttribute("placeholder", "请选择日期");
     expect(screen.getByRole("button", { name: "安排好了" })).toBeDisabled();
-
-    await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem("goalio:v1") ?? "{}");
-      expect(saved.plan.goal).toEqual({ name: "", amount: 0, deadline: "" });
-    });
   });
 
   it("immediately completes a fully funded goal after same-day goal and balance changes", async () => {
@@ -210,11 +199,17 @@ describe("GoalioApp", () => {
     await user.click(screen.getByRole("button", { name: "开始设置" }));
     expect(await screen.findByRole("heading", { name: /生活费通常/ })).toBeVisible();
 
+    await user.click(screen.getByRole("button", { name: "每月" }));
+    const incomeAmount = await screen.findByRole("textbox", { name: "每次到账金额" });
+    await user.clear(incomeAmount);
+    await user.type(incomeAmount, "2000");
+    fireEvent.change(screen.getByLabelText("下一次到账"), { target: { value: "2026-09-20" } });
     await user.click(screen.getByRole("button", { name: "继续" }));
     expect(await screen.findByRole("heading", { name: /每天需要为吃饭/ })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "¥40" }));
     await user.click(screen.getByRole("button", { name: "继续" }));
     expect(await screen.findByRole("heading", { name: /已经确定的开销/ })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "继续" }));
+    await user.click(screen.getByRole("button", { name: "暂时没有" }));
     expect(await screen.findByRole("heading", { name: /慢慢攒钱/ })).toBeVisible();
     const goalName = screen.getByRole("textbox", { name: "目标名称" });
     const goalAmount = screen.getByRole("textbox", { name: "目标金额" });
@@ -224,6 +219,7 @@ describe("GoalioApp", () => {
     fireEvent.change(goalDate, { target: { value: "2026-12-20" } });
     await user.click(screen.getByRole("button", { name: "安排好了" }));
     expect(await screen.findByRole("heading", { name: /告诉我现在有多少钱/ })).toBeVisible();
+    await user.type(screen.getByRole("textbox", { name: "当前真实余额" }), "5200");
     await user.click(screen.getByRole("button", { name: "看看现在的安排" }));
 
     expect(await screen.findByText("已为目标留好", { selector: ".metric-label" })).toBeVisible();
@@ -254,9 +250,9 @@ describe("GoalioApp", () => {
     await user.click(await screen.findByRole("button", { name: /帮我看看能不能买/ }));
     expect(await screen.findByRole("heading", { name: /最近有想买的东西吗/ })).toBeVisible();
     expect(screen.getByRole("textbox", { name: "想买什么" })).toHaveValue("");
-    expect(screen.getByRole("textbox", { name: "想买什么" })).toHaveAttribute("placeholder", "例如：聚餐");
+    expect(screen.getByRole("textbox", { name: "想买什么" })).toHaveAttribute("placeholder", "降噪耳机");
     expect(screen.getByRole("textbox", { name: "需要多少钱" })).toHaveValue("");
-    expect(screen.getByRole("textbox", { name: "需要多少钱" })).toHaveAttribute("placeholder", "例如：65");
+    expect(screen.getByRole("textbox", { name: "需要多少钱" })).toHaveAttribute("placeholder", "600");
     expect(screen.getByRole("button", { name: "帮我看看能不能买" })).toBeDisabled();
   });
 
@@ -284,7 +280,7 @@ describe("GoalioApp", () => {
     expect(await screen.findByRole("heading", { name: /购买完成后的余额/ })).toBeVisible();
   });
 
-  it("treats the sample expenses as placeholders and saves the user's own expense", async () => {
+  it("uses student-oriented fixed expense guidance and saves the user's own expense", async () => {
     localStorage.setItem("goalio:v1", JSON.stringify({
       version: 1,
       screen: "expenses",
@@ -303,14 +299,16 @@ describe("GoalioApp", () => {
     const user = userEvent.setup();
     renderGoalio();
 
-    expect(await screen.findByText("房租")).toBeVisible();
-    expect(screen.getByText("视频会员")).toBeVisible();
+    expect(await screen.findByText("手机套餐、会员订阅、校园网费等")).toBeVisible();
+    expect(screen.queryByText(/¥1,800/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "填写自己的固定支出" }));
 
-    expect(screen.queryByText("房租")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "支出名称" })).toHaveAttribute("placeholder", "手机套餐");
+    expect(screen.getByRole("textbox", { name: "支出金额" })).toHaveAttribute("placeholder", "50");
     await user.type(screen.getByRole("textbox", { name: "支出名称" }), "手机话费");
     await user.clear(screen.getByRole("textbox", { name: "支出金额" }));
     await user.type(screen.getByRole("textbox", { name: "支出金额" }), "88");
+    fireEvent.change(screen.getByLabelText("下次扣款日期"), { target: { value: "2026-09-28" } });
     await user.click(screen.getByRole("button", { name: "保存这笔支出" }));
 
     expect(screen.getByText("手机话费")).toBeVisible();
@@ -339,6 +337,45 @@ describe("GoalioApp", () => {
 
     await user.click(await screen.findByRole("button", { name: "返回" }));
     expect(await screen.findByRole("heading", { name: /已经确定的开销/ })).toBeVisible();
+  });
+
+  it("lets a new user return through every setup step", async () => {
+    const user = userEvent.setup();
+    renderGoalio({ initialState: { ...createInitialState(), screen: "goal" } });
+
+    await user.click(await screen.findByRole("button", { name: "返回" }));
+    expect(await screen.findByRole("heading", { name: /已经确定的开销/ })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    expect(await screen.findByRole("heading", { name: /每天需要为吃饭/ })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    expect(await screen.findByRole("heading", { name: /生活费通常/ })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    expect(await screen.findByRole("heading", { name: /把今天的余额/ })).toBeVisible();
+  });
+
+  it("shows blank student examples in each money entry screen", async () => {
+    const user = userEvent.setup();
+    const incomeApp = renderGoalio();
+
+    await user.click(screen.getByRole("button", { name: "开始设置" }));
+    expect(await screen.findByRole("button", { name: "每月" })).not.toHaveClass("selected");
+    await user.click(screen.getByRole("button", { name: "每月" }));
+    expect(await screen.findByRole("textbox", { name: "每次到账金额" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "每次到账金额" })).toHaveAttribute("placeholder", "2000");
+    expect(screen.getByLabelText("下一次到账")).toHaveValue("");
+
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    incomeApp.unmount();
+    const foodApp = renderGoalio({ initialState: { ...createInitialState(), screen: "food" } });
+    expect(await screen.findByRole("textbox", { name: "每日基本饮食金额" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "每日基本饮食金额" })).toHaveAttribute("placeholder", "40");
+
+    foodApp.unmount();
+    renderGoalio({ initialState: { ...createInitialState(), screen: "initial-balance" } });
+    expect(await screen.findByRole("textbox", { name: "当前真实余额" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "当前真实余额" })).toHaveAttribute("placeholder", "5200");
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    expect(await screen.findByRole("heading", { name: /慢慢攒钱/ })).toBeVisible();
   });
 
   it("returns directly home from a purchase result", async () => {

@@ -108,7 +108,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .detail-group label { min-height: 60px; display: grid; grid-template-columns: 1fr minmax(120px, 55%); gap: 12px; align-items: center; border-bottom: 1px solid var(--line); color: var(--muted); }
 .detail-group label:last-child { border-bottom: 0; }
 .detail-group input { width: 100%; border: 0; background: transparent; outline: 0; text-align: right; color: var(--ink); font-size: 21px; font-weight: 550; min-width: 0; }
-.purchase-fields input::placeholder { color: var(--muted); font-weight: 450; opacity: 1; }
+.detail-group input::placeholder, .expense-editor input::placeholder, .money-field input::placeholder { color: #74747c; font-weight: 400; opacity: 1; }
 .money-field { margin-top: 54px; height: 136px; border: 1.5px solid var(--blue); border-radius: 19px; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.03); }
 .money-field .currency { font-size: 58px; font-weight: 450; }
 .money-field input { width: 65%; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 74px; font-weight: 560; letter-spacing: -.04em; }
@@ -123,9 +123,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .expense-row b { position: absolute; right: 2px; color: var(--muted); font-size: 26px; font-weight: 300; }
 .expense-row:active { background: #f0f0f3; }
 .expense-examples { width: 100%; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; color: #acacb4; transition: opacity 140ms, transform 160ms var(--ease-out), background-color 160ms; }
-.expense-examples .summary-row { color: #a5a5ad; }
-.expense-examples .summary-row span { color: #b5b5bc; }
-.expense-examples small { display: block; padding: 13px 0 7px; color: #b1b1b9; font-size: 13px; }
+.expense-examples strong { display: block; padding: 19px 0 8px; color: #74747c; font-size: 17px; font-weight: 450; }
+.expense-examples small { display: block; padding: 0 0 19px; color: #74747c; font-size: 13px; }
 .expense-examples:active { opacity: .58; transform: scale(.985); background: #f5f5f7; }
 .expense-editor { animation: rise 240ms var(--ease-out) both; }
 .expense-editor label { min-height: 62px; display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); color: var(--muted); }
@@ -144,7 +143,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .add-row:active { opacity: .55; transform: scale(.98); }
 .goal-fields { padding: 0 16px; margin-top: 40px; }
 .goal-fields label { grid-template-columns: 1fr minmax(120px, 48%) 26px; min-height: 76px; }
-.goal-fields input::placeholder { color: #b5b5bc; opacity: 1; font-weight: 450; }
 .goal-fields i { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--blue); color: #fff; font-style: normal; font-size: 13px; }
 .balance-content { padding-top: clamp(74px, 14vh, 130px); }
 .balance-content .money-field { border-color: var(--line); height: 150px; }
