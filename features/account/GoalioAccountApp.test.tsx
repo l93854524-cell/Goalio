@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cents } from "@/lib/domain/money";
@@ -80,6 +80,7 @@ describe("GoalioAccountApp", () => {
 
     expect(await screen.findByText(/正在为/)).toBeVisible();
     expect(screen.queryByRole("heading", { name: "建立你的 Goalio 账号" })).not.toBeInTheDocument();
+    expect(screen.queryByText("已同步")).not.toBeInTheDocument();
   });
 
   it("offers retry when cloud and cache are both unavailable", async () => {
@@ -105,7 +106,9 @@ describe("GoalioAccountApp", () => {
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
     window.dispatchEvent(new Event("online"));
 
-    expect(await screen.findByText("已同步")).toBeVisible();
+    await waitFor(() => expect(services.cloud.save).toHaveBeenCalled());
+    expect(screen.queryByText("等待同步")).not.toBeInTheDocument();
+    expect(screen.queryByText("已同步")).not.toBeInTheDocument();
   });
 
   it("does not sign out while the latest local change cannot sync", async () => {

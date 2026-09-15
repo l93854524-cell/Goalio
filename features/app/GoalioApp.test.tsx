@@ -232,7 +232,7 @@ describe("GoalioApp", () => {
     expect(screen.getByText(/仍能在目标日期前准备好/)).toBeVisible();
   });
 
-  it("opens purchase evaluation from the home result", async () => {
+  it("opens a fresh purchase form from home with examples kept as placeholders", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
     localStorage.setItem("goalio:v1", JSON.stringify({
       version: 1,
@@ -247,12 +247,17 @@ describe("GoalioApp", () => {
       balance: 300000,
       history: [],
       lastResult: { date: "2026-09-06", balance: 300000, effectiveSaved: 62000 },
-      purchase: null,
+      purchase: { name: "上次的聚餐", amount: 6500 },
     }));
     const user = userEvent.setup();
     renderGoalio();
     await user.click(await screen.findByRole("button", { name: /帮我看看能不能买/ }));
     expect(await screen.findByRole("heading", { name: /最近有想买的东西吗/ })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "想买什么" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "想买什么" })).toHaveAttribute("placeholder", "例如：聚餐");
+    expect(screen.getByRole("textbox", { name: "需要多少钱" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "需要多少钱" })).toHaveAttribute("placeholder", "例如：65");
+    expect(screen.getByRole("button", { name: "帮我看看能不能买" })).toBeDisabled();
   });
 
   it("asks for the post-purchase balance after goal completion", async () => {
@@ -363,6 +368,28 @@ describe("GoalioApp", () => {
     expect(screen.queryByText("延后购买")).not.toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: "返回主页" }));
     expect(await screen.findByRole("heading", { name: "已经准备好了" })).toBeVisible();
+  });
+
+  it("keeps the current purchase values when editing a result", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
+    const initial = createInitialState();
+    renderGoalio({
+      initialState: {
+        ...initial,
+        screen: "purchase-result",
+        onboarded: true,
+        balance: cents(1000000),
+        plan: { ...initial.plan, goal: { name: "一台新电脑", amount: cents(800000), deadline: "2026-12-20" } },
+        lastResult: { date: "2026-09-06", balance: cents(1000000), effectiveSaved: cents(800000) },
+        purchase: { name: "耳机", amount: cents(90000) },
+      },
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "修改商品或金额" }));
+
+    expect(await screen.findByRole("textbox", { name: "想买什么" })).toHaveValue("耳机");
+    expect(screen.getByRole("textbox", { name: "需要多少钱" })).toHaveValue("900");
   });
 
   it("states the unchanged completion date when the existing plan is already late", async () => {

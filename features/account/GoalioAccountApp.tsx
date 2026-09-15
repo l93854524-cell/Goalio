@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CloudArrowUp, WarningCircle } from "@phosphor-icons/react";
 import type { AccountUser, AuthGateway, CloudStateGateway, Credentials, SyncStatus } from "@/lib/account/contracts";
 import { authErrorMessage } from "@/lib/account/auth-errors";
 import { createBrowserSupabaseGateways } from "@/lib/account/supabase";
@@ -200,10 +201,14 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
     }
   };
 
-  const statusLabel = syncStatus === "synced" ? "已同步" : syncStatus === "pending" ? "等待同步" : "同步失败";
   return (
     <div className="account-app">
-      <div className="sync-banner" data-status={syncStatus} aria-live="polite">{statusLabel}</div>
+      {syncStatus !== "synced" && (
+        <div className="sync-banner" data-status={syncStatus} role={syncStatus === "failed" ? "alert" : "status"} aria-live={syncStatus === "failed" ? "assertive" : "polite"}>
+          {syncStatus === "pending" ? <CloudArrowUp size={16} weight="regular" aria-hidden="true" /> : <WarningCircle size={16} weight="fill" aria-hidden="true" />}
+          <span>{syncStatus === "pending" ? "等待同步" : "同步失败"}</span>
+        </div>
+      )}
       {actionError && <p className="account-action-error" role="alert">{actionError}</p>}
       <GoalioApp
         key={user.id}

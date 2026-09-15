@@ -430,7 +430,7 @@ function needsDailyCheckIn(state: GoalioState, today: string) {
   return !state.lastResult || state.lastResult.date < today;
 }
 
-function HomeScreen({ state, go, today }: ScreenProps & { today: string }) {
+function HomeScreen({ state, update, go, today }: ScreenProps & { today: string }) {
   const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
   const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
   const saved = result.effectiveSaved;
@@ -477,14 +477,14 @@ function HomeScreen({ state, go, today }: ScreenProps & { today: string }) {
             )}
           </div>
         ) : <div className="unknown-box">还缺少{result.missing.join("、")}，暂时无法可靠判断完成日期。</div>}
-        <button className="purchase-entry reveal-3" onClick={() => go("purchase-input")}><span>帮我看看能不能买</span><b>→</b></button>
+        <button className="purchase-entry reveal-3" onClick={() => update(current => ({ ...current, screen: "purchase-input", purchase: null }))}><span>帮我看看能不能买</span><b>→</b></button>
       </div>
     </Screen>
   );
 }
 
 function PurchaseInputScreen({ state, update, go }: ScreenProps) {
-  const purchase = state.purchase ?? { name: "耳机", amount: cents(119900) };
+  const purchase = state.purchase ?? { name: "", amount: cents(0) };
   const [amountValid, setAmountValid] = useState(purchase.amount > 0);
   const canEvaluate = !!purchase.name.trim() && amountValid;
   return (
@@ -494,8 +494,8 @@ function PurchaseInputScreen({ state, update, go }: ScreenProps) {
         <h1>最近有想买的东西吗？</h1>
         <p className="lead centered">告诉我金额，<br />我帮你看看它会不会影响现在的生活和目标。</p>
         <div className="panel detail-group purchase-fields">
-          <label><span>想买什么</span><input aria-label="想买什么" value={purchase.name} onChange={event => update(draft => ({ ...draft, purchase: { ...purchase, name: event.target.value } }))} /></label>
-          <label><span>需要多少钱</span><AmountInput allowZero={false} value={purchase.amount} label="需要多少钱" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, purchase: { ...purchase, amount } }))} /></label>
+          <label><span>想买什么</span><input aria-label="想买什么" placeholder="例如：聚餐" value={purchase.name} onChange={event => update(draft => ({ ...draft, purchase: { ...purchase, name: event.target.value } }))} /></label>
+          <label><span>需要多少钱</span><AmountInput allowZero={false} emptyWhenZero placeholder="例如：65" value={purchase.amount} label="需要多少钱" onValidityChange={setAmountValid} onChange={amount => update(draft => ({ ...draft, purchase: { ...purchase, amount } }))} /></label>
         </div>
         <p className="hint centered">我会把这笔消费放进未来的安排里重新计算。</p>
       </div>
