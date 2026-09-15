@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { cents } from "@/lib/domain/money";
 import { createInitialState } from "@/lib/storage/schema";
 import { clearUserCache, readUserCache, writeUserCache } from "./user-cache";
 
@@ -6,8 +7,8 @@ describe("user cache", () => {
   beforeEach(() => localStorage.clear());
 
   it("keeps two users in separate cache entries", () => {
-    const a = { ...createInitialState(), balance: 100 };
-    const b = { ...createInitialState(), balance: 200 };
+    const a = { ...createInitialState(), balance: cents(100) };
+    const b = { ...createInitialState(), balance: cents(200) };
     writeUserCache(localStorage, "user-a", { state: a, savedAt: "2026-09-15T10:00:00.000Z", pendingSync: true });
     writeUserCache(localStorage, "user-b", { state: b, savedAt: "2026-09-15T10:01:00.000Z", pendingSync: false });
 

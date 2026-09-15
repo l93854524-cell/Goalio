@@ -78,9 +78,8 @@ function isScheduledAmount(value: unknown): value is ScheduledAmount {
 }
 
 function isFixedExpense(value: unknown): value is FixedExpense {
-  return isScheduledAmount(value)
-    && typeof value.id === "string"
-    && typeof value.name === "string";
+  if (!isRecord(value) || !isScheduledAmount(value)) return false;
+  return typeof value.id === "string" && typeof value.name === "string";
 }
 
 function isSavingsGoal(value: unknown): value is SavingsGoal {
