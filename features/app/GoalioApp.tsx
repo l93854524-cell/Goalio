@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CalendarBlank, CheckCircle, Wallet, Warning } from "@phosphor-icons/react";
 import { PressableButton } from "@/components/ui/PressableButton";
 import { addDays, addMonths, formatChineseDate, formatChineseFullDate, todayISO } from "@/lib/domain/dates";
@@ -8,8 +8,8 @@ import { cents, formatYuan, parseYuan, type Cents } from "@/lib/domain/money";
 import type { BalanceSnapshot, Cadence, FixedExpense, ScheduledAmount } from "@/lib/domain/types";
 import { evaluatePurchase, type PurchaseEvaluation } from "@/lib/simulation/purchase";
 import { runSimulation } from "@/lib/simulation/simulator";
-import { createInitialState, type GoalioState, type ScreenName } from "@/lib/storage/schema";
-import { loadGoalioState, saveGoalioState } from "@/lib/storage/storage";
+import type { SyncStatus } from "@/lib/account/contracts";
+import type { GoalioState, ScreenName } from "@/lib/storage/schema";
 
 const CADENCES: { value: Cadence; label: string }[] = [
   { value: "weekly", label: "每周" },
@@ -413,7 +413,7 @@ function BalanceScreen({ state, update, daily = false, today }: ScreenProps & { 
         <p className="lead">{afterPurchase ? "请填写购买完成后的最新真实余额，消费金额已经包含在这个数字里。" : dailyCheckIn ? "昨天的余额已经放好了。确认一下今天的数字，我会重新照看接下来的安排。" : "请填写此刻可以用于日常生活和这个目标的真实余额。今天已经发生的收入和支出，都算在这个数字里。"}</p>
         <MoneyField autoFocus={dailyCheckIn} large value={state.balance} label="当前真实余额" onValidityChange={setAmountValid} onChange={balance => update(draft => ({ ...draft, balance }))} />
         {dailyCheckIn && <p className="prefill-note">已带入上次余额，输入时会自动全选</p>}
-        <div className="privacy-lock"><span aria-hidden="true">▣</span><p>余额、收入和支出只保存在这台设备上。<br />我不会从余额中实际转走任何钱。</p></div>
+        <div className="privacy-lock"><span aria-hidden="true">▣</span><p>数据会加密传输并保存到你的 Goalio 账号，当前设备也会保留缓存。<br />我不会从余额中实际转走任何钱。</p></div>
       </div>
       <BottomActions primary={afterPurchase ? "完成" : dailyCheckIn ? "更新余额" : "看看现在的安排"} disabled={!amountValid} loadingLabel={dailyCheckIn ? "正在更新今天的安排…" : "正在帮你照看接下来的日子…"} successLabel={dailyCheckIn ? "余额已更新" : undefined} onPrimary={submit} />
     </Screen>
@@ -555,7 +555,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
   );
 }
 
-function SettingsScreen({ state, go, today }: ScreenProps & { today: string }) {
+function SettingsScreen({ state, go, today, account }: ScreenProps & { today: string; account?: GoalioAccountControls }) {
   const income = state.plan.income;
   const incomeDate = income ? nextIncomeDate(income, today) : null;
   return (
@@ -569,7 +569,23 @@ function SettingsScreen({ state, go, today }: ScreenProps & { today: string }) {
           <button onClick={() => go("goal")}><strong>当前目标</strong><span>{state.plan.goal.name} · {formatYuan(state.plan.goal.amount)} · {formatChineseDate(state.plan.goal.deadline, today)}</span><b>›</b></button>
         </div>
         <button className="text-button standalone" onClick={() => go("income")}>重新安排</button>
-        <div className="data-note"><h2>你的数据</h2><p>余额、收入、支出和目标只保存在这台设备上。</p></div>
+        {account && (
+          <section className="account-settings" aria-labelledby="account-settings-title">
+            <h2 id="account-settings-title">账号</h2>
+            <div className="account-card">
+              <div><strong>登录邮箱</strong><span>{account.email}</span></div>
+              {account.syncStatus === "failed" ? (
+                <button onClick={account.onRetrySync}>同步失败，点击重试</button>
+              ) : (
+                <div><strong>数据状态</strong><span>{account.syncStatus === "synced" ? "已同步" : "等待同步"}</span></div>
+              )}
+              <button className="sign-out-button" onClick={account.onSignOut} disabled={account.signingOut}>
+                {account.signingOut ? "正在退出…" : "退出登录"}
+              </button>
+            </div>
+          </section>
+        )}
+        <div className="data-note"><h2>你的数据</h2><p>数据传输过程会加密，并保存到你的 Goalio 账号；当前设备也会保留一份缓存，方便断网时继续更新。</p></div>
       </div>
     </Screen>
   );
@@ -594,34 +610,48 @@ type ScreenProps = {
   go: (screen: ScreenName) => void;
 };
 
-export function GoalioApp() {
-  const [state, setState] = useState<GoalioState>(createInitialState);
-  const [hydrated, setHydrated] = useState(false);
+export interface GoalioAccountControls {
+  email: string;
+  syncStatus: SyncStatus;
+  signingOut: boolean;
+  onRetrySync: () => void;
+  onSignOut: () => void;
+}
+
+export interface GoalioAppProps {
+  initialState: GoalioState;
+  onStateChange: (state: GoalioState) => void;
+  account?: GoalioAccountControls;
+}
+
+export function GoalioApp({ initialState, onStateChange, account }: GoalioAppProps) {
   const [demoDate, setDemoDate] = useState("2026-09-06");
   const demo = process.env.NEXT_PUBLIC_GOALIO_DEMO_DATE === "true" || process.env.NODE_ENV === "development";
   const today = demo ? demoDate : todayISO();
   const [launchDate] = useState(today);
+  const [state, setState] = useState<GoalioState>(() => needsDailyCheckIn(initialState, launchDate) ? { ...initialState, screen: "daily-balance" } : initialState);
+  const stateRef = useRef(state);
+  const startupChanged = useRef(state.screen !== initialState.screen);
 
   useEffect(() => {
-    let active = true;
-    queueMicrotask(() => {
-      if (!active) return;
-      const loaded = loadGoalioState(window.localStorage).state;
-      setState(needsDailyCheckIn(loaded, launchDate) ? { ...loaded, screen: "daily-balance" } : loaded);
-      setHydrated(true);
-    });
-    return () => { active = false; };
-  }, [launchDate]);
-  useEffect(() => {
-    if (hydrated) saveGoalioState(window.localStorage, state);
-  }, [hydrated, state]);
-  const update = (producer: (draft: GoalioState) => GoalioState) => setState(current => producer(current));
-  const go = useMemo(() => (screen: ScreenName) => setState(current => ({ ...current, screen })), []);
+    if (!startupChanged.current) return;
+    startupChanged.current = false;
+    onStateChange(stateRef.current);
+  }, [onStateChange]);
+
+  const update = useCallback((producer: (draft: GoalioState) => GoalioState) => {
+    const next = producer(stateRef.current);
+    if (next === stateRef.current) return;
+    stateRef.current = next;
+    setState(next);
+    onStateChange(next);
+  }, [onStateChange]);
+  const go = useMemo(() => (screen: ScreenName) => update(current => current.screen === screen ? current : { ...current, screen }), [update]);
   const moveDemoDate = (days: number) => {
     const nextDate = addDays(demoDate, days);
     setDemoDate(nextDate);
     if (days > 0) {
-      setState(current => canStartDailyCheckIn(current) ? { ...current, screen: "daily-balance" } : current);
+      update(current => canStartDailyCheckIn(current) ? { ...current, screen: "daily-balance" } : current);
     }
   };
   const props = { state, update, go };
@@ -647,7 +677,7 @@ export function GoalioApp() {
     }
     case "purchase-input": view = <PurchaseInputScreen {...props} />; break;
     case "purchase-result": view = <PurchaseResultScreen {...props} today={today} />; break;
-    case "settings": view = <SettingsScreen {...props} today={today} />; break;
+    case "settings": view = <SettingsScreen {...props} today={today} account={account} />; break;
     case "complete": view = <CompleteScreen {...props} />; break;
     case "post-purchase": view = <BalanceScreen {...props} daily today={today} />; break;
     case "finished": view = <FinishedScreen state={state} />; break;

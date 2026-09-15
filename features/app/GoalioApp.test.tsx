@@ -1,15 +1,82 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GoalioApp } from "./GoalioApp";
+import { GoalioApp, type GoalioAppProps } from "./GoalioApp";
+import { createInitialState } from "@/lib/storage/schema";
+import { loadGoalioState, saveGoalioState } from "@/lib/storage/storage";
+import { todayISO } from "@/lib/domain/dates";
+import { cents } from "@/lib/domain/money";
+
+function renderGoalio(overrides: Partial<GoalioAppProps> = {}) {
+  const initialState = overrides.initialState ?? loadGoalioState(localStorage).state;
+  const onStateChange = overrides.onStateChange ?? ((state: GoalioAppProps["initialState"]) => saveGoalioState(localStorage, state));
+  return render(<GoalioApp initialState={initialState} onStateChange={onStateChange} account={overrides.account} />);
+}
+
+function renderReadyGoalio(account: NonNullable<GoalioAppProps["account"]>) {
+  const initial = createInitialState();
+  const date = todayISO();
+  return renderGoalio({
+    account,
+    initialState: {
+      ...initial,
+      screen: "home",
+      onboarded: true,
+      balance: cents(300000),
+      plan: { ...initial.plan, goal: { name: "旅行", amount: cents(180000), deadline: "2026-12-20" } },
+      lastResult: { date, balance: cents(300000), effectiveSaved: cents(60000) },
+    },
+  });
+}
 
 describe("GoalioApp", () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => vi.unstubAllEnvs());
 
+  it("reports business state changes to the account owner", async () => {
+    const user = userEvent.setup();
+    const onStateChange = vi.fn();
+    render(<GoalioApp initialState={createInitialState()} onStateChange={onStateChange} />);
+
+    await user.click(screen.getByRole("button", { name: "开始设置" }));
+
+    await waitFor(() => expect(onStateChange).toHaveBeenLastCalledWith(expect.objectContaining({ screen: "income" })));
+  });
+
+  it("does not report unchanged state on the initial render", async () => {
+    const onStateChange = vi.fn();
+    render(<GoalioApp initialState={createInitialState()} onStateChange={onStateChange} />);
+
+    await screen.findByRole("button", { name: "开始设置" });
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it("shows the signed-in email and retries a failed sync", async () => {
+    const user = userEvent.setup();
+    const onRetrySync = vi.fn();
+    renderReadyGoalio({ email: "person@example.com", syncStatus: "failed", signingOut: false, onRetrySync, onSignOut: vi.fn() });
+
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    expect(screen.getByText("person@example.com")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "同步失败，点击重试" }));
+
+    expect(onRetrySync).toHaveBeenCalledOnce();
+  });
+
+  it("requests sign-out from settings", async () => {
+    const user = userEvent.setup();
+    const onSignOut = vi.fn();
+    renderReadyGoalio({ email: "person@example.com", syncStatus: "synced", signingOut: false, onRetrySync: vi.fn(), onSignOut });
+
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    await user.click(screen.getByRole("button", { name: "退出登录" }));
+
+    expect(onSignOut).toHaveBeenCalledOnce();
+  });
+
   it("keeps first-goal examples as placeholders until the user enters real values", async () => {
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     await user.click(screen.getByRole("button", { name: "开始设置" }));
     await user.click(await screen.findByRole("button", { name: "继续" }));
@@ -51,7 +118,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     const amount = await screen.findByRole("textbox", { name: "目标金额" });
     await user.clear(amount);
@@ -89,7 +156,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
 
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByRole("heading", { name: "正在为「旅行」准备" })).toBeVisible();
     expect(screen.getByText("¥185", { selector: ".hero-amount" })).toBeVisible();
@@ -114,7 +181,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     async function updateBalance(value: string) {
       await user.click(await screen.findByRole("button", { name: "更新余额" }));
@@ -137,7 +204,7 @@ describe("GoalioApp", () => {
 
   it("completes the setup journey and shows a calculated goal result", async () => {
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(screen.getByRole("heading", { name: /把今天的余额/ })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "开始设置" }));
@@ -183,7 +250,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
     await user.click(await screen.findByRole("button", { name: /帮我看看能不能买/ }));
     expect(await screen.findByRole("heading", { name: /最近有想买的东西吗/ })).toBeVisible();
   });
@@ -207,7 +274,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
     await user.click(await screen.findByRole("button", { name: "我已经购买" }));
     expect(await screen.findByRole("heading", { name: /购买完成后的余额/ })).toBeVisible();
   });
@@ -229,7 +296,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByText("房租")).toBeVisible();
     expect(screen.getByText("视频会员")).toBeVisible();
@@ -263,7 +330,7 @@ describe("GoalioApp", () => {
     };
     localStorage.setItem("goalio:v1", JSON.stringify(state));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     await user.click(await screen.findByRole("button", { name: "返回" }));
     expect(await screen.findByRole("heading", { name: /已经确定的开销/ })).toBeVisible();
@@ -287,7 +354,7 @@ describe("GoalioApp", () => {
       purchase: { name: "耳机", amount: 90000 },
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByRole("heading", { name: "可以安心购买" })).toBeVisible();
     expect(screen.getByText("这笔消费不会影响目标进度")).toBeVisible();
@@ -315,7 +382,7 @@ describe("GoalioApp", () => {
       lastResult: { date: "2026-09-06", balance: 1000000, effectiveSaved: 800000 },
       purchase: { name: "手机壳", amount: 5200 },
     }));
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByRole("heading", { name: "可以安心购买" })).toBeVisible();
     expect(screen.getByText("这笔消费不会影响目标进度")).toBeVisible();
@@ -342,7 +409,7 @@ describe("GoalioApp", () => {
       purchase: { name: "耳机", amount: 15000 },
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     const heading = await screen.findByRole("heading", { name: "这笔消费会让目标晚于计划" });
     expect(heading).toBeVisible();
@@ -375,7 +442,7 @@ describe("GoalioApp", () => {
       lastResult: { date: "2026-09-06", balance: 300000, effectiveSaved: 62000 },
       purchase: null,
     }));
-    render(<GoalioApp />);
+    renderGoalio();
 
     const topBar = await screen.findByRole("banner");
     expect(within(topBar).getByText("9 月 6 日 · 星期日")).toBeVisible();
@@ -403,7 +470,7 @@ describe("GoalioApp", () => {
       lastChange: -30400,
       purchase: null,
     }));
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByText("今天的目标进度减少了 ¥304")).toBeVisible();
     expect(screen.getByRole("progressbar")).toHaveAttribute("data-trend", "down");
@@ -426,7 +493,7 @@ describe("GoalioApp", () => {
       lastResult: { date: "2026-09-06", balance: 300000, effectiveSaved: 62000 },
       purchase: null,
     }));
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByText("当前的安排还需要一点调整")).toBeVisible();
     expect(screen.getByText(/目标时间可能会晚一些/)).toBeVisible();
@@ -453,7 +520,7 @@ describe("GoalioApp", () => {
       lastChange: 0,
       purchase: null,
     }));
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByText("¥289", { selector: ".hero-amount" })).toBeVisible();
     expect(screen.getByText("¥491", { selector: ".result-list strong" })).toBeVisible();
@@ -481,7 +548,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     await user.click(await screen.findByRole("button", { name: "后一天" }));
     await user.click(await screen.findByRole("button", { name: "更新余额" }));
@@ -509,7 +576,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByText(/演示日期.*9 月 6 日/)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "后一天" }));
@@ -537,7 +604,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByRole("heading", { name: /正在为「一台新电脑」准备/ })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "后一天" }));
@@ -562,7 +629,7 @@ describe("GoalioApp", () => {
       lastResult: { date: "2026-09-05", balance: 300000, effectiveSaved: 62000 },
       purchase: null,
     }));
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByRole("heading", { name: "今天手上还有多少？" })).toBeVisible();
     const balance = screen.getByRole("textbox", { name: "当前真实余额" }) as HTMLInputElement;
@@ -589,7 +656,7 @@ describe("GoalioApp", () => {
       lastResult: { date: "2026-09-05", balance: 300000, effectiveSaved: 62000 },
       purchase: null,
     }));
-    render(<GoalioApp />);
+    renderGoalio();
 
     const date = await screen.findByLabelText("2026 年 9 月 6 日，星期日");
     expect(date.children[0]).toHaveTextContent(/^6日$/);
@@ -614,7 +681,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    const app = render(<GoalioApp />);
+    const app = renderGoalio();
 
     const balance = await screen.findByRole("textbox", { name: "当前真实余额" });
     await user.clear(balance);
@@ -629,7 +696,7 @@ describe("GoalioApp", () => {
     });
 
     app.unmount();
-    render(<GoalioApp />);
+    renderGoalio();
     expect(await screen.findByRole("heading", { name: /正在为「一台新电脑」准备/ })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "今天手上还有多少？" })).not.toBeInTheDocument();
   });
@@ -652,7 +719,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     await user.click(await screen.findByRole("button", { name: "编辑手机话费" }));
     expect(screen.getByRole("textbox", { name: "支出名称" })).toHaveValue("手机话费");
@@ -696,7 +763,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     await user.click(await screen.findByRole("button", { name: "编辑手机话费" }));
     await user.click(screen.getByRole("button", { name: "删除这笔" }));
@@ -730,7 +797,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     await user.click(await screen.findByRole("button", { name: /固定支出/ }));
     expect(await screen.findByRole("heading", { name: /已经确定的开销/ })).toBeVisible();
@@ -756,7 +823,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
 
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByText("每周 ¥500 · 下次 9 月 14 日到账")).toBeVisible();
     expect(screen.queryByText(/每月 ¥500/)).not.toBeInTheDocument();
@@ -780,7 +847,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
 
-    render(<GoalioApp />);
+    renderGoalio();
 
     expect(await screen.findByText("每周 ¥500 · 下次 9 月 7 日到账")).toBeVisible();
   });
@@ -803,7 +870,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     await user.click(await screen.findByRole("button", { name: "重新安排" }));
     await user.click(await screen.findByRole("button", { name: "继续" }));
@@ -831,7 +898,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     const income = await screen.findByRole("textbox", { name: "每次到账金额" });
     await user.clear(income);
@@ -876,7 +943,7 @@ describe("GoalioApp", () => {
       purchase: null,
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     const amount = await screen.findByRole("textbox", { name: "目标金额" });
     await user.clear(amount);
@@ -907,7 +974,7 @@ describe("GoalioApp", () => {
       purchase: { name: "耳机", amount: 119900 },
     }));
     const user = userEvent.setup();
-    render(<GoalioApp />);
+    renderGoalio();
 
     const amount = await screen.findByRole("textbox", { name: "需要多少钱" });
     await user.clear(amount);
