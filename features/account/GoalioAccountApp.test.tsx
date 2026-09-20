@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cents } from "@/lib/domain/money";
 import { createInitialState, type GoalioState, type ScreenName } from "@/lib/storage/schema";
 import type { AccountUser, AuthGateway, CloudStateGateway, CloudStateRecord } from "@/lib/account/contracts";
@@ -47,9 +47,13 @@ function fakeServices(options: FakeServiceOptions = {}) {
 
 describe("GoalioAccountApp", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00+08:00"));
     localStorage.clear();
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
   });
+
+  afterEach(() => vi.useRealTimers());
 
   it("shows login when no persistent session exists", async () => {
     render(<GoalioAccountApp services={fakeServices({ currentUser: null })} storage={localStorage} />);

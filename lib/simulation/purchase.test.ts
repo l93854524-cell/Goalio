@@ -47,6 +47,30 @@ describe("evaluatePurchase cash-flow scenarios", () => {
     expect(result.kind).toBe("no-impact");
   });
 
+  it("reports current goal progress used while preserving the completion date", () => {
+    const result = evaluatePurchase({
+      today: "2026-09-06",
+      balance: cents(40000),
+      plan: plan({
+        income: { cadence: "once", amount: cents(30000), nextDate: "2026-10-01" },
+        goal: { name: "短袖", amount: cents(40000), deadline: "2026-10-01" },
+      }),
+      previous: { date: "2026-09-06", effectiveSaved: cents(25000) },
+      name: "短袖",
+      amount: cents(21000),
+    });
+
+    expect(result.kind).toBe("progress-reduced");
+    if (result.kind === "progress-reduced") {
+      expect(result.amount).toBe(cents(6000));
+      expect(result.baselineSaved).toBe(cents(25000));
+      expect(result.scenarioSaved).toBe(cents(19000));
+      expect(result.baselineDate).toBe("2026-10-01");
+      expect(result.scenarioDate).toBe("2026-10-01");
+      expect(result.maxNoDelayAmount).toBe(cents(15000));
+    }
+  });
+
   it("re-simulates different purchase amounts into different impact levels", () => {
     const testPlan = plan({
       income: { cadence: "monthly", amount: cents(10000), nextDate: "2026-01-20" },

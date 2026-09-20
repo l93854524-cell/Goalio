@@ -487,6 +487,11 @@ function resultCopy(result: PurchaseEvaluation, today: string) {
   if (result.kind === "shortfall") return { title: "这笔消费会影响安排", kicker: `未来可能缺少 ${formatYuan(result.amount)}`, body: "建议降低预算，或等余额更充足时再购买。" };
   if (result.kind === "unknown") return { title: "现在还无法放心判断", kicker: "还缺少一些信息", body: `目前缺少${result.missing.join("、")}，暂时无法可靠计算这笔消费会带来多少影响。` };
   if (result.kind === "unreachable") return { title: "这笔消费会影响目标", kicker: "完成时间将无法确定", body: "按当前余额和计划，暂时无法可靠预测目标的完成日期。" };
+  if (result.kind === "progress-reduced") return {
+    title: "仍然可以购买",
+    kicker: "预计完成时间保持不变",
+    body: `会挤占当前已留金额 ${formatYuan(result.amount)}，后续结余将优先补回。`,
+  };
   if (result.kind === "no-impact") return { title: "可以安心购买", kicker: "这笔消费不会影响目标进度", body: "预计完成时间保持不变" };
   if (result.kind === "delayed-in-time") return {
     title: "仍然可以购买",
@@ -506,7 +511,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
   const result = evaluatePurchase({ today, balance: state.balance, plan: state.plan, previous, ...purchase });
   const copy = resultCopy(result, today);
   const noImpact = result.kind === "no-impact";
-  const showAlternatives = result.kind === "delayed-in-time" || result.kind === "delayed";
+  const showAlternatives = result.kind === "progress-reduced" || result.kind === "delayed-in-time" || result.kind === "delayed";
   return (
     <Screen className="purchase-result-screen">
       <TopBar back backLabel="返回主页" onBack={() => go("home")} right={<span />} />

@@ -442,6 +442,32 @@ describe("GoalioApp", () => {
     expect(screen.getByRole("textbox", { name: "需要多少钱" })).toHaveValue("900");
   });
 
+  it("explains when an affordable purchase uses current goal progress", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
+    const initial = createInitialState();
+    renderGoalio({
+      initialState: {
+        ...initial,
+        screen: "purchase-result",
+        onboarded: true,
+        balance: cents(40000),
+        plan: {
+          ...initial.plan,
+          income: { cadence: "once", amount: cents(30000), nextDate: "2026-10-01" },
+          goal: { name: "短袖", amount: cents(40000), deadline: "2026-10-01" },
+        },
+        lastResult: { date: "2026-09-06", balance: cents(40000), effectiveSaved: cents(25000) },
+        purchase: { name: "短袖", amount: cents(21000) },
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "仍然可以购买" })).toBeVisible();
+    expect(screen.getByText("预计完成时间保持不变")).toBeVisible();
+    expect(screen.getByText("会挤占当前已留金额 ¥60，后续结余将优先补回。")).toBeVisible();
+    expect(screen.getByText("短袖 · ¥210")).toBeVisible();
+    expect(screen.getByText("今天最多花 ¥150")).toBeVisible();
+  });
+
   it("states the unchanged completion date when the existing plan is already late", async () => {
     vi.stubEnv("NEXT_PUBLIC_GOALIO_DEMO_DATE", "true");
     localStorage.setItem("goalio:v1", JSON.stringify({

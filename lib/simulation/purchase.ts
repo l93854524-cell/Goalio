@@ -16,6 +16,7 @@ export interface PurchaseInput {
 
 type PurchaseKind =
   | { kind: "no-impact"; completionDate: string }
+  | { kind: "progress-reduced"; amount: Cents; baselineSaved: Cents; scenarioSaved: Cents; baselineDate: string; scenarioDate: string }
   | { kind: "delayed-in-time"; baselineDate: string; scenarioDate: string; delayDays: number; deadline: string }
   | { kind: "delayed"; baselineDate: string; scenarioDate: string; delayDays: number; deadlineLateDays: number }
   | { kind: "shortfall"; amount: Cents }
@@ -104,6 +105,17 @@ export function evaluatePurchase(input: PurchaseInput): PurchaseEvaluation {
 
   const delayDays = Math.max(0, daysBetween(baseline.completionDate, scenarioDate));
 
+  if (delayDays === 0 && scenario.effectiveSaved < baseline.effectiveSaved) {
+    return {
+      kind: "progress-reduced",
+      amount: cents(baseline.effectiveSaved - scenario.effectiveSaved),
+      baselineSaved: baseline.effectiveSaved,
+      scenarioSaved: scenario.effectiveSaved,
+      baselineDate: baseline.completionDate,
+      scenarioDate,
+      ...alternatives,
+    };
+  }
   if (delayDays === 0) return { kind: "no-impact", completionDate: baseline.completionDate, ...alternatives };
   if (scenarioDate <= input.plan.goal.deadline) {
     return {
