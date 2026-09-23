@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Goalio 小红书首发素材</title>
+  <style>
+    :root { --blue:#007aff; --ink:#0a0a0b; --muted:#707078; --line:#dedee3; --soft:#f6f6f8; --paper:#fff; }
+    * { box-sizing:border-box; }
+    html,body { margin:0; background:#171719; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Helvetica Neue",Arial,sans-serif; color:var(--ink); -webkit-font-smoothing:antialiased; }
+    .artboard { position:relative; display:none; width:1080px; height:1440px; overflow:hidden; background:var(--paper); }
+    .artboard.active { display:flex; flex-direction:column; }
+    .pad { padding:76px 82px 70px; }
+    .kicker { display:flex; align-items:center; justify-content:space-between; color:var(--blue); font-size:22px; font-weight:700; letter-spacing:.03em; }
+    .kicker .num { color:#a1a1a9; font-variant-numeric:tabular-nums; }
+    h1,h2,p { margin:0; }
+    h1 { max-width:930px; margin-top:52px; font-size:82px; line-height:1.08; letter-spacing:-.065em; font-weight:760; }
+    h2 { font-size:60px; line-height:1.14; letter-spacing:-.055em; font-weight:740; }
+    .sub { margin-top:28px; color:var(--muted); font-size:31px; line-height:1.55; letter-spacing:-.025em; }
+    .blue { color:var(--blue); }
+    .brand { font-size:42px; font-weight:720; letter-spacing:-.065em; }
+    .tag { display:inline-flex; align-items:center; min-height:48px; padding:0 20px; border-radius:999px; background:#eef6ff; color:var(--blue); font-size:22px; font-weight:680; }
+    .tag.dark { background:#111; color:#fff; }
+    .rule { height:1px; background:var(--line); }
+    .phone { position:relative; overflow:hidden; border:1px solid rgba(10,10,11,.10); border-radius:48px; background:#fff; box-shadow:0 34px 90px rgba(22,32,58,.14),0 8px 22px rgba(10,10,11,.06); }
+    .phone img { display:block; width:100%; height:auto; }
+    .phone:after { content:""; position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 1px rgba(255,255,255,.55); pointer-events:none; }
+    .footer { display:flex; align-items:center; justify-content:space-between; margin-top:auto; color:#93939b; font-size:20px; }
+    .dot { width:11px; height:11px; border-radius:50%; background:var(--blue); box-shadow:0 0 0 8px rgba(0,122,255,.09); }
+
+    /* Note cover */
+    #note-01 { background:radial-gradient(circle at 90% 4%,rgba(0,122,255,.10),transparent 33%),#fff; }
+    #note-01 h1 { margin-top:66px; font-size:96px; line-height:1.04; }
+    #note-01 .question-mark { position:absolute; top:46px; right:62px; color:rgba(0,122,255,.08); font-size:330px; font-weight:800; line-height:1; }
+    .cover-story { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:54px; }
+    .cover-story div { padding:24px 22px; border:1px solid var(--line); border-radius:22px; background:rgba(255,255,255,.86); }
+    .cover-story span { display:block; color:var(--muted); font-size:19px; }
+    .cover-story strong { display:block; margin-top:10px; font-size:32px; letter-spacing:-.04em; }
+    .cover-ui { position:absolute; left:82px; right:82px; bottom:-590px; height:1040px; border-radius:52px 52px 0 0; }
+    .cover-ui img { transform:translateY(-5px); }
+    .cover-fade { position:absolute; z-index:2; left:82px; right:82px; bottom:0; height:180px; background:linear-gradient(transparent,#fff); }
+    .cover-brand { position:absolute; z-index:3; left:82px; right:82px; bottom:0; height:112px; display:flex; align-items:center; gap:18px; padding:0 22px; background:#fff; }
+    .cover-brand span { color:var(--muted); font-size:21px; }
+
+    /* Note 02 */
+    #note-02 { background:linear-gradient(180deg,#fff 0%,#fff 57%,#f6f8fb 100%); }
+    .scenario-line { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:end; margin-top:38px; padding:28px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .scenario-line span { color:var(--muted); font-size:24px; }
+    .scenario-line strong { font-size:40px; letter-spacing:-.04em; }
+    .note2-phone { position:absolute; left:165px; right:165px; top:650px; height:850px; }
+
+    /* Note 03 */
+    #note-03 h2 { margin-top:44px; }
+    .metric-pills { display:flex; gap:14px; margin-top:30px; }
+    .metric-pills span { padding:14px 18px; border-radius:14px; background:var(--soft); color:#53535b; font-size:20px; }
+    .home-phone { position:absolute; left:150px; right:150px; top:448px; height:1080px; }
+    .home-phone img { transform:translateY(0); }
+    .floating-note { position:absolute; z-index:2; right:64px; top:820px; width:310px; padding:24px 26px; border-radius:22px; background:#0a0a0b; color:#fff; box-shadow:0 22px 55px rgba(0,0,0,.22); }
+    .floating-note span { display:block; color:#9dc8ff; font-size:18px; }
+    .floating-note strong { display:block; margin-top:8px; font-size:39px; letter-spacing:-.05em; }
+
+    /* Note 04 */
+    #note-04 { background:#f6f7f9; }
+    .note4-copy { position:relative; z-index:3; }
+    .purchase-phone { position:absolute; left:122px; right:122px; top:430px; height:1080px; }
+    .purchase-phone img { transform:translateY(0); }
+    .arrow-chip { position:absolute; z-index:4; left:74px; top:880px; padding:20px 26px; border-radius:20px; background:var(--blue); color:#fff; font-size:25px; font-weight:700; box-shadow:0 18px 40px rgba(0,122,255,.25); }
+
+    /* Note 05 */
+    #note-05 { background:radial-gradient(circle at 50% 42%,rgba(0,122,255,.09),transparent 40%),#fff; }
+    .result-phone { position:absolute; left:150px; right:150px; top:418px; height:1050px; }
+    .result-phone img { transform:translateY(0); }
+    .result-caption { position:absolute; z-index:3; top:372px; right:82px; display:flex; align-items:center; gap:12px; padding:8px 14px; border-radius:14px; background:#eef6ff; color:var(--blue); font-size:20px; font-weight:700; }
+
+    /* Note 06 */
+    #note-06 { background:#0a0a0b; color:#fff; }
+    #note-06 .kicker { color:#78b7ff; }
+    #note-06 h1 { margin-top:88px; font-size:86px; }
+    #note-06 .sub { max-width:750px; color:#a9a9b0; }
+    .launch-price { display:flex; align-items:flex-end; justify-content:space-between; margin-top:100px; padding:48px 0 40px; border-top:1px solid #2f2f33; border-bottom:1px solid #2f2f33; }
+    .launch-price span { color:#a9a9b0; font-size:23px; }
+    .launch-price strong { color:#fff; font-size:126px; line-height:.9; letter-spacing:-.075em; }
+    .delivery-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:48px; }
+    .delivery-grid div { min-height:145px; padding:26px 22px; border:1px solid #303036; border-radius:20px; background:#141417; }
+    .delivery-grid b { display:block; color:#78b7ff; font-size:28px; }
+    .delivery-grid span { display:block; margin-top:12px; color:#aaaab2; font-size:19px; line-height:1.45; }
+    .cta-line { display:flex; align-items:center; justify-content:space-between; margin-top:auto; font-size:24px; color:#b9b9c0; }
+    .cta-line .brand { color:#fff; font-size:50px; }
+
+    /* Product 01 */
+    #product-01 { background:linear-gradient(150deg,#f4f8ff,#fff 56%); }
+    #product-01 h1 { font-size:88px; }
+    .equation { margin-top:74px; padding:44px 48px; border:1px solid #d7e8ff; border-radius:30px; background:rgba(255,255,255,.78); box-shadow:0 26px 70px rgba(0,122,255,.09); }
+    .equation .row { display:flex; align-items:center; justify-content:space-between; padding:22px 0; border-bottom:1px solid var(--line); font-size:31px; }
+    .equation .row:last-child { border-bottom:0; color:var(--blue); font-weight:750; }
+    .equation .row span { color:var(--muted); }
+    .equation .row:last-child span { color:var(--blue); }
+    .product-foot { margin-top:auto; padding-top:32px; border-top:1px solid var(--line); color:var(--muted); font-size:24px; line-height:1.6; }
+
+    /* Product 02 */
+    #product-02 .home-phone { top:360px; height:1110px; }
+    .core-label { position:absolute; z-index:4; left:64px; top:690px; width:292px; padding:24px; border-radius:22px; background:#0a0a0b; color:#fff; box-shadow:0 20px 55px rgba(0,0,0,.24); }
+    .core-label b { display:block; color:#78b7ff; font-size:20px; }
+    .core-label strong { display:block; margin-top:8px; font-size:42px; }
+
+    /* Product 03 */
+    #product-03 { background:#f6f7f9; }
+    .compare { display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-top:52px; }
+    .compare .phone { height:860px; border-radius:34px; }
+    .compare img { width:100%; }
+    .compare-labels { display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-top:22px; }
+    .compare-labels div { padding:20px 22px; border-radius:18px; background:#fff; font-size:20px; line-height:1.45; }
+    .compare-labels b { display:block; color:var(--blue); font-size:26px; }
+
+    /* Product 04 */
+    #product-04 { background:#fff; }
+    .feature-list { display:grid; gap:0; margin-top:68px; border-top:1px solid var(--line); }
+    .feature { display:grid; grid-template-columns:74px 1fr auto; align-items:center; gap:22px; min-height:155px; border-bottom:1px solid var(--line); }
+    .feature i { display:grid; place-items:center; width:58px; height:58px; border-radius:17px; background:#eef6ff; color:var(--blue); font-style:normal; font-size:28px; font-weight:750; }
+    .feature b { font-size:31px; }
+    .feature span { color:var(--muted); font-size:22px; text-align:right; }
+    .mini-ui { margin-top:48px; padding:30px 36px; border-radius:28px; background:var(--soft); }
+    .mini-ui .line { display:flex; justify-content:space-between; padding:18px 0; border-bottom:1px solid var(--line); font-size:23px; }
+    .mini-ui .line:last-child { border-bottom:0; }
+    .mini-ui span { color:var(--muted); }
+
+    /* Product 05 */
+    #product-05 { background:#0a0a0b; color:#fff; }
+    #product-05 .kicker { color:#78b7ff; }
+    #product-05 h1 { margin-top:70px; font-size:92px; }
+    .buy-card { margin-top:72px; padding:48px; border:1px solid #323238; border-radius:34px; background:linear-gradient(145deg,#17171b,#101012); }
+    .buy-price { display:flex; align-items:end; justify-content:space-between; padding-bottom:38px; border-bottom:1px solid #34343a; }
+    .buy-price span { color:#a9a9b0; font-size:24px; }
+    .buy-price strong { font-size:116px; line-height:.9; letter-spacing:-.075em; }
+    .buy-list { display:grid; gap:0; margin-top:20px; }
+    .buy-list div { display:flex; align-items:center; justify-content:space-between; min-height:88px; border-bottom:1px solid #2d2d32; font-size:26px; }
+    .buy-list div:last-child { border-bottom:0; }
+    .buy-list span { color:#a9a9b0; }
+    .buy-list b { color:#fff; }
+    .delivery-note { margin-top:auto; padding:28px 32px; border-radius:22px; background:var(--blue); color:#fff; font-size:27px; font-weight:700; text-align:center; }
+  </style>
+</head>
+<body>
+  <section class="artboard pad" id="note-01">
+    <div class="question-mark">?</div>
+    <div class="kicker"><span>大学生的一个真实困惑</span><span class="num">01 / 06</span></div>
+    <h1>卡里还有钱，<br>到底敢花多少？</h1>
+    <div class="cover-story">
+      <div><span>卡里余额</span><strong>¥6,800</strong></div>
+      <div><span>旅行目标</span><strong>¥10,000</strong></div>
+      <div><span>想买手表</span><strong>¥2,999</strong></div>
+    </div>
+    <div class="phone cover-ui"><img src="../source-screens/home-hi.png" alt="Goalio 真实结果页"></div>
+    <div class="cover-fade"></div>
+    <div class="cover-brand"><b class="brand">Goalio</b><span>把余额变成安心的决定</span></div>
+  </section>
+
+  <section class="artboard pad" id="note-02">
+    <div class="kicker"><span>我的真实情况</span><span class="num">02 / 06</span></div>
+    <h2 style="margin-top:44px">每月 2,500 生活费，<br>想存一万去日本</h2>
+    <p class="sub">卡里还有 6,800，又看上 ¥2,999 的 Apple Watch。买完会不会打乱旅行计划？</p>
+    <div class="scenario-line"><span>每天基本饮食</span><strong>¥35</strong></div>
+    <div class="phone note2-phone"><img src="../source-screens/settings-hi.png" alt="Goalio 设置页"></div>
+    <div class="footer"><span>输入已经确定的收入、开销和目标</span><span class="dot"></span></div>
+  </section>
+
+  <section class="artboard pad" id="note-03">
+    <div class="kicker"><span>Goalio 开始计算</span><span class="num">03 / 06</span></div>
+    <h2>先给生活留位置，<br>再算真正能留给目标的钱</h2>
+    <div class="metric-pills"><span>月收入 ¥2,500</span><span>余额 ¥6,800</span><span>目标 ¥10,000</span></div>
+    <div class="phone home-phone"><img src="../source-screens/home-hi.png" alt="Goalio 首页真实计算结果"></div>
+    <div class="floating-note"><span>已为旅行留好</span><strong>¥3,273</strong></div>
+  </section>
+
+  <section class="artboard pad" id="note-04">
+    <div class="note4-copy">
+      <div class="kicker"><span>把想买的东西放进去</span><span class="num">04 / 06</span></div>
+      <h2 style="margin-top:44px">Apple Watch ¥2,999，<br>会影响日本旅行吗？</h2>
+      <p class="sub">Goalio 会把这笔消费放进现在的计划里重新计算。</p>
+    </div>
+    <div class="phone purchase-phone"><img src="../source-screens/purchase-input-hi.png" alt="Goalio 消费输入页"></div>
+    <div class="arrow-chip">真实输入 → 真实计算</div>
+  </section>
+
+  <section class="artboard pad" id="note-05">
+    <div class="kicker"><span>这次的结果</span><span class="num">05 / 06</span></div>
+    <h2 style="margin-top:44px">可以买。<br><span class="blue">旅行日期保持不变。</span></h2>
+    <p class="sub">按这组真实数据，¥2,999 不会影响日本旅行的目标进度。</p>
+    <div class="phone result-phone"><img src="../source-screens/purchase-result-hi.png" alt="Goalio 消费模拟结论"></div>
+    <div class="result-caption"><span class="dot"></span><span>预计完成：2027 年 7 月 15 日</span></div>
+  </section>
+
+  <section class="artboard pad" id="note-06">
+    <div class="kicker"><span>现在已经可以用了</span><span class="num">06 / 06</span></div>
+    <h1>所以我把<br>Goalio 放出来了。</h1>
+    <p class="sub">给同样会在“想存钱”和“想消费”之间纠结的人。</p>
+    <div class="launch-price"><span>首发价格</span><strong>¥3.14</strong></div>
+    <div class="delivery-grid">
+      <div><b>网页使用</b><span>打开就能用</span></div>
+      <div><b>无需下载</b><span>手机浏览器即可</span></div>
+      <div><b>自动发货</b><span>网址 + 邀请码</span></div>
+    </div>
+    <div class="cta-line"><span class="brand">Goalio</span><span>已放到小红书个人售卖</span></div>
+  </section>
+
+  <section class="artboard pad" id="product-01">
+    <div class="kicker"><span>GOALIO</span><span class="num">01 / 05</span></div>
+    <h1>卡里有钱，<br>还不等于敢花。</h1>
+    <p class="sub">Goalio 帮你先照顾生活和目标，再看一笔钱能不能安心花。</p>
+    <div class="equation">
+      <div class="row"><span>当前余额</span><b>¥6,800</b></div>
+      <div class="row"><span>生活与固定支出</span><b>先留好</b></div>
+      <div class="row"><span>日本旅行目标</span><b>持续推进</b></div>
+      <div class="row"><span>真正敢花的金额</span><b>重新计算</b></div>
+    </div>
+    <p class="product-foot">适合目标储蓄与日常消费规划。<br>不涉及理财、投资或资金托管。</p>
+  </section>
+
+  <section class="artboard pad" id="product-02">
+    <div class="kicker"><span>真实 Goalio 页面</span><span class="num">02 / 05</span></div>
+    <h2 style="margin-top:40px">一眼看到最重要的结果</h2>
+    <div class="phone home-phone"><img src="../source-screens/home-hi.png" alt="Goalio 核心结果页"></div>
+    <div class="core-label"><b>明天额外最多可花</b><strong>¥3,247</strong></div>
+  </section>
+
+  <section class="artboard pad" id="product-03">
+    <div class="kicker"><span>消费模拟</span><span class="num">03 / 05</span></div>
+    <h2 style="margin-top:40px">Apple Watch 会影响<br>日本旅行吗？</h2>
+    <div class="compare">
+      <div class="phone"><img src="../source-screens/purchase-input-hi.png" alt="输入 Apple Watch 价格"></div>
+      <div class="phone"><img src="../source-screens/purchase-result-hi.png" alt="Goalio 计算结果"></div>
+    </div>
+    <div class="compare-labels">
+      <div><b>输入</b>Apple Watch · ¥2,999</div>
+      <div><b>结论</b>旅行完成时间保持不变</div>
+    </div>
+  </section>
+
+  <section class="artboard pad" id="product-04">
+    <div class="kicker"><span>使用后可以看到</span><span class="num">04 / 05</span></div>
+    <h2 style="margin-top:40px">每天更新一次，<br>决定会更清楚。</h2>
+    <div class="feature-list">
+      <div class="feature"><i>¥</i><b>已为目标留好</b><span>¥3,273</span></div>
+      <div class="feature"><i>日</i><b>预计准备好</b><span>2027.07.15</span></div>
+      <div class="feature"><i>+</i><b>额外最多可花</b><span>¥3,247</span></div>
+      <div class="feature"><i>✓</i><b>消费影响</b><span>日期是否改变</span></div>
+    </div>
+    <div class="mini-ui">
+      <div class="line"><span>每月生活费</span><b>¥2,500</b></div>
+      <div class="line"><span>每天基本饮食</span><b>¥35</b></div>
+      <div class="line"><span>当前目标</span><b>日本旅行 · ¥10,000</b></div>
+    </div>
+  </section>
+
+  <section class="artboard pad" id="product-05">
+    <div class="kicker"><span>购买与交付</span><span class="num">05 / 05</span></div>
+    <h1>Goalio</h1>
+    <div class="buy-card">
+      <div class="buy-price"><span>首发价格</span><strong>¥3.14</strong></div>
+      <div class="buy-list">
+        <div><span>使用方式</span><b>网页直接使用</b></div>
+        <div><span>是否下载</span><b>无需下载 App</b></div>
+        <div><span>发货方式</span><b>付款后自动发货</b></div>
+        <div><span>你会收到</span><b>网页地址 + 邀请码</b></div>
+      </div>
+    </div>
+    <div class="delivery-note">付款后按自动发货消息打开 Goalio</div>
+  </section>
+
+  <script>
+    const requested = new URLSearchParams(location.search).get("slide") || "note-01";
+    const board = document.getElementById(requested);
+    if (board) board.classList.add("active");
+  </script>
+</body>
+</html>

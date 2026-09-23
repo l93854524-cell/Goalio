@@ -1,5 +1,5 @@
-import { GoalioAccountApp } from "@/features/account/GoalioAccountApp";
+import { GoalioInviteApp } from "@/features/access/GoalioInviteApp";
 
 export default function HomePage() {
-  return <GoalioAccountApp />;
+  return <GoalioInviteApp />;
 }

@@ -37,6 +37,18 @@ button { -webkit-tap-highlight-color: transparent; }
 .auth-switch:disabled { opacity: .5; cursor: default; }
 .startup-screen { align-items: center; justify-content: center; text-align: center; }
 .startup-mark { font-size: 50px; font-weight: 680; letter-spacing: -3.6px; }
+.invite-access-screen { justify-content: center; padding-block: max(38px, env(safe-area-inset-top)) max(34px, env(safe-area-inset-bottom)); }
+.invite-access-brand { font-size: 48px; font-weight: 680; letter-spacing: -3.5px; line-height: 1; }
+.invite-access-copy { margin-top: 84px; }
+.invite-access-copy .eyebrow { margin: 0 0 16px; font-size: 15px; }
+.invite-access-copy h1 { margin: 0; font-size: 46px; line-height: 1.15; letter-spacing: -.055em; }
+.invite-access-copy > p:last-child { max-width: 340px; margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.7; }
+.invite-access-form { display: grid; gap: 16px; margin-top: 42px; }
+.invite-access-form label { display: grid; gap: 9px; color: #54545c; font-size: 14px; font-weight: 600; }
+.invite-access-form input { width: 100%; min-height: 66px; padding: 0 18px; border: 1.5px solid var(--line); border-radius: 16px; background: #fafafc; color: var(--ink); font-size: 24px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; outline: 0; }
+.invite-access-form input:focus { border-color: var(--blue); box-shadow: 0 0 0 5px rgba(0,122,255,.07); }
+.invite-access-form .pressable-button { margin-top: 6px; }
+.invite-access-note { margin: 22px 0 0; color: #92929a; font-size: 14px; text-align: center; }
 .startup-screen > p { max-width: 320px; margin: 24px auto 0; color: var(--muted); line-height: 1.65; }
 .account-error h1 { margin: 64px 0 0; font-size: 32px; letter-spacing: -.045em; }
 .account-error .pressable-button { min-height: 56px; margin-top: 32px; font-size: 18px; }
