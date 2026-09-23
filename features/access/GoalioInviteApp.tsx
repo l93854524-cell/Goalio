@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { GoalioAccountApp } from "@/features/account/GoalioAccountApp";
 
 const ACCESS_KEY = "goalio:invite-access:v1";
-const INVITE_CODE = "GOALIO314";
+const INVITE_CODE = "rrclyby943";
 
 export function GoalioInviteApp() {
   const [accessGranted, setAccessGranted] = useState(false);
@@ -23,7 +23,7 @@ export function GoalioInviteApp() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalized = code.trim().toUpperCase();
+    const normalized = code.trim().toLowerCase();
     if (normalized !== INVITE_CODE) {
       setError("邀请码不正确，请检查后再试。");
       return;
@@ -51,11 +51,10 @@ export function GoalioInviteApp() {
             <span>邀请码</span>
             <input
               aria-label="邀请码"
-              autoCapitalize="characters"
+              autoCapitalize="none"
               autoComplete="off"
               value={code}
-              onChange={event => setCode(event.target.value.toUpperCase())}
-              placeholder="GOALIO314"
+              onChange={event => setCode(event.target.value)}
             />
           </label>
           {error && <p className="form-error" role="alert">{error}</p>}

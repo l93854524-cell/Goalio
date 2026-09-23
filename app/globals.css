@@ -45,7 +45,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .invite-access-copy > p:last-child { max-width: 340px; margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.7; }
 .invite-access-form { display: grid; gap: 16px; margin-top: 42px; }
 .invite-access-form label { display: grid; gap: 9px; color: #54545c; font-size: 14px; font-weight: 600; }
-.invite-access-form input { width: 100%; min-height: 66px; padding: 0 18px; border: 1.5px solid var(--line); border-radius: 16px; background: #fafafc; color: var(--ink); font-size: 24px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; outline: 0; }
+.invite-access-form input { width: 100%; min-height: 66px; padding: 0 18px; border: 1.5px solid var(--line); border-radius: 16px; background: #fafafc; color: var(--ink); font-size: 24px; font-weight: 650; letter-spacing: .08em; outline: 0; }
 .invite-access-form input:focus { border-color: var(--blue); box-shadow: 0 0 0 5px rgba(0,122,255,.07); }
 .invite-access-form .pressable-button { margin-top: 6px; }
 .invite-access-note { margin: 22px 0 0; color: #92929a; font-size: 14px; text-align: center; }

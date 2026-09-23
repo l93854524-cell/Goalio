@@ -26,6 +26,7 @@ describe("Goalio invite access", () => {
     render(<HomePage />);
 
     expect(await screen.findByRole("heading", { name: "输入邀请码" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "邀请码" })).not.toHaveAttribute("placeholder");
     expect(screen.queryByRole("heading", { name: "建立你的 Goalio 账号" })).not.toBeInTheDocument();
   });
 
@@ -34,20 +35,29 @@ describe("Goalio invite access", () => {
     render(<HomePage />);
 
     const input = await screen.findByRole("textbox", { name: "邀请码" });
-    await user.type(input, "WRONG");
+    await user.type(input, "GOALIO314");
     await user.click(screen.getByRole("button", { name: "开始使用" }));
     expect(screen.getByRole("alert")).toHaveTextContent("邀请码不正确");
 
     await user.clear(input);
-    await user.type(input, "goalio314");
+    await user.type(input, "RrClYbY943");
+    expect(input).toHaveValue("RrClYbY943");
     await user.click(screen.getByRole("button", { name: "开始使用" }));
     expect(await screen.findByRole("heading", { name: "建立你的 Goalio 账号" })).toBeVisible();
+    expect(localStorage.getItem("goalio:invite-access:v1")).toBe("rrclyby943");
   });
 
   it("remembers invite access on the same device", async () => {
-    localStorage.setItem("goalio:invite-access:v1", "GOALIO314");
+    localStorage.setItem("goalio:invite-access:v1", "rrclyby943");
     render(<HomePage />);
 
     expect(await screen.findByRole("heading", { name: "建立你的 Goalio 账号" })).toBeVisible();
+  });
+
+  it("asks for the new code when the old invite code was saved", async () => {
+    localStorage.setItem("goalio:invite-access:v1", "GOALIO314");
+    render(<HomePage />);
+
+    expect(await screen.findByRole("heading", { name: "输入邀请码" })).toBeVisible();
   });
 });
