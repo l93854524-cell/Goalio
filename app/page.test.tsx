@@ -1,7 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
+
+vi.mock("@/lib/account/supabase", () => ({
+  createBrowserSupabaseGateways: () => ({
+    auth: {
+      currentUser: vi.fn(async () => null),
+      signUp: vi.fn(),
+      signIn: vi.fn(),
+      signOutCurrentDevice: vi.fn(),
+      onChange: vi.fn(() => () => undefined),
+    },
+    cloud: {
+      load: vi.fn(async () => null),
+      save: vi.fn(),
+    },
+  }),
+}));
 
 describe("Goalio invite access", () => {
   beforeEach(() => localStorage.clear());
@@ -10,10 +26,10 @@ describe("Goalio invite access", () => {
     render(<HomePage />);
 
     expect(await screen.findByRole("heading", { name: "输入邀请码" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "开始设置" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "建立你的 Goalio 账号" })).not.toBeInTheDocument();
   });
 
-  it("opens Goalio only after the correct invite code", async () => {
+  it("opens account login only after the correct invite code", async () => {
     const user = userEvent.setup();
     render(<HomePage />);
 
@@ -25,13 +41,13 @@ describe("Goalio invite access", () => {
     await user.clear(input);
     await user.type(input, "goalio314");
     await user.click(screen.getByRole("button", { name: "开始使用" }));
-    expect(await screen.findByRole("button", { name: "开始设置" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "建立你的 Goalio 账号" })).toBeVisible();
   });
 
   it("remembers invite access on the same device", async () => {
     localStorage.setItem("goalio:invite-access:v1", "GOALIO314");
     render(<HomePage />);
 
-    expect(await screen.findByRole("button", { name: "开始设置" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "建立你的 Goalio 账号" })).toBeVisible();
   });
 });

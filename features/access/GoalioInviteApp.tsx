@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { GoalioApp } from "@/features/app/GoalioApp";
-import type { GoalioState } from "@/lib/storage/schema";
-import { loadGoalioState, saveGoalioState } from "@/lib/storage/storage";
+import { GoalioAccountApp } from "@/features/account/GoalioAccountApp";
 
 const ACCESS_KEY = "goalio:invite-access:v1";
 const INVITE_CODE = "GOALIO314";
 
 export function GoalioInviteApp() {
-  const [initialState, setInitialState] = useState<GoalioState | null>(null);
+  const [accessGranted, setAccessGranted] = useState(false);
   const [ready, setReady] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -17,7 +15,7 @@ export function GoalioInviteApp() {
   useEffect(() => {
     queueMicrotask(() => {
       if (window.localStorage.getItem(ACCESS_KEY) === INVITE_CODE) {
-        setInitialState(loadGoalioState(window.localStorage).state);
+        setAccessGranted(true);
       }
       setReady(true);
     });
@@ -32,14 +30,14 @@ export function GoalioInviteApp() {
     }
     window.localStorage.setItem(ACCESS_KEY, INVITE_CODE);
     setError("");
-    setInitialState(loadGoalioState(window.localStorage).state);
+    setAccessGranted(true);
   };
 
   if (!ready) {
     return <main className="screen startup-screen" aria-label="正在打开 Goalio"><div className="startup-mark">goalio</div></main>;
   }
 
-  if (!initialState) {
+  if (!accessGranted) {
     return (
       <main className="screen invite-access-screen screen-enter">
         <header className="invite-access-brand" aria-label="Goalio">goalio</header>
@@ -68,10 +66,5 @@ export function GoalioInviteApp() {
     );
   }
 
-  return (
-    <GoalioApp
-      initialState={initialState}
-      onStateChange={state => saveGoalioState(window.localStorage, state)}
-    />
-  );
+  return <GoalioAccountApp />;
 }
