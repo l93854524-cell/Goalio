@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { GoalioAccountApp } from "@/features/account/GoalioAccountApp";
+import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
+
+const GoalioAccountApp = lazy(() => import("@/features/account/GoalioAccountApp").then(module => ({ default: module.GoalioAccountApp })));
 
 const ACCESS_KEY = "goalio:invite-access:v1";
 const INVITE_CODE = "rrclyby943";
@@ -65,5 +66,5 @@ export function GoalioInviteApp() {
     );
   }
 
-  return <GoalioAccountApp />;
+  return <Suspense fallback={<main className="screen startup-screen" aria-label="正在打开 Goalio"><div className="startup-mark">goalio</div></main>}><GoalioAccountApp /></Suspense>;
 }

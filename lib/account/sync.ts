@@ -17,6 +17,7 @@ type SyncOptions = {
   isOnline?: () => boolean;
   debounceMs?: number;
   onStatusChange?: (status: SyncStatus) => void;
+  onRemoteState?: (state: GoalioState) => void;
 };
 
 export class GoalioSyncCoordinator {
@@ -34,39 +35,24 @@ export class GoalioSyncCoordinator {
 
   async hydrate(): Promise<{ state: GoalioState; status: SyncStatus }> {
     const cached = readUserCache(this.options.storage, this.options.userId);
+    if (cached) {
+      this.setStatus(cached.pendingSync ? "pending" : "synced");
+      const generation = this.generation;
+      void this.reconcileCachedState(generation).catch(() => undefined);
+      return { state: cached.state, status: this.status };
+    }
+
     let remote;
 
     try {
       remote = await this.options.cloud.load(this.options.userId);
     } catch {
-      if (!cached) throw new AccountSyncError("INITIAL_STATE_UNAVAILABLE");
-      this.writePending(cached.state, cached.savedAt);
-      return { state: cached.state, status: this.status };
-    }
-
-    if (cached?.pendingSync && (!remote || cached.savedAt > remote.updatedAt)) {
-      this.setStatus("pending");
-      try {
-        await this.flush();
-      } catch {
-        // The local copy remains usable and pending for a later retry.
-      }
-      return { state: cached.state, status: this.status };
+      throw new AccountSyncError("INITIAL_STATE_UNAVAILABLE");
     }
 
     if (remote) {
       this.writeSynced(remote.state, remote.updatedAt);
       return { state: remote.state, status: this.status };
-    }
-
-    if (cached) {
-      this.writePending(cached.state, cached.savedAt);
-      try {
-        await this.flush();
-      } catch {
-        // The cache retains the state until connectivity recovers.
-      }
-      return { state: cached.state, status: this.status };
     }
 
     const state = createInitialState();
@@ -78,6 +64,39 @@ export class GoalioSyncCoordinator {
       // First-run data remains in the device cache for retry.
     }
     return { state, status: this.status };
+  }
+
+  private async reconcileCachedState(generation: number) {
+    let remote;
+    try {
+      remote = await this.options.cloud.load(this.options.userId);
+    } catch {
+      const cached = readUserCache(this.options.storage, this.options.userId);
+      if (cached && !cached.pendingSync) this.writePending(cached.state, cached.savedAt);
+      return;
+    }
+
+    const cached = readUserCache(this.options.storage, this.options.userId);
+    if (!cached) return;
+    if (generation !== this.generation) {
+      if (cached.pendingSync) await this.flush();
+      return;
+    }
+
+    if (cached.pendingSync && (!remote || cached.savedAt > remote.updatedAt)) {
+      this.setStatus("pending");
+      await this.flush();
+      return;
+    }
+
+    if (remote) {
+      this.writeSynced(remote.state, remote.updatedAt);
+      if (JSON.stringify(cached.state) !== JSON.stringify(remote.state)) this.options.onRemoteState?.(remote.state);
+      return;
+    }
+
+    this.writePending(cached.state, cached.savedAt);
+    await this.flush();
   }
 
   record(state: GoalioState) {

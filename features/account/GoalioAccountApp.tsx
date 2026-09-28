@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CloudArrowUp, WarningCircle } from "@phosphor-icons/react";
 import type { AccountUser, AuthGateway, CloudStateGateway, Credentials, SyncStatus } from "@/lib/account/contracts";
 import { authErrorMessage } from "@/lib/account/auth-errors";
@@ -8,8 +8,9 @@ import { createBrowserSupabaseGateways } from "@/lib/account/supabase";
 import { GoalioSyncCoordinator } from "@/lib/account/sync";
 import { clearUserCache } from "@/lib/account/user-cache";
 import type { GoalioState } from "@/lib/storage/schema";
-import { GoalioApp } from "@/features/app/GoalioApp";
 import { AuthScreen } from "./AuthScreen";
+
+const GoalioApp = lazy(() => import("@/features/app/GoalioApp").then(module => ({ default: module.GoalioApp })));
 
 export interface GoalioAccountServices {
   auth: AuthGateway;
@@ -61,10 +62,12 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
   const [user, setUser] = useState<AccountUser | null>(null);
   const [initialState, setInitialState] = useState<GoalioState | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced");
+  const [appStateRevision, setAppStateRevision] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
   const [actionError, setActionError] = useState("");
   const coordinatorRef = useRef<GoalioSyncCoordinator | null>(null);
   const activeUserRef = useRef<AccountUser | null>(null);
+  const remoteStateRef = useRef<GoalioState | null>(null);
   const requestRef = useRef(0);
   const deviceStorage = storage ?? (typeof window === "undefined" ? null : window.localStorage);
 
@@ -75,8 +78,10 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
     coordinatorRef.current = null;
     if (current && deviceStorage) clearUserCache(deviceStorage, current.id);
     activeUserRef.current = null;
+    remoteStateRef.current = null;
     setUser(null);
     setInitialState(null);
+    setAppStateRevision(0);
     setActionError("");
     setPhase("signed-out");
   }, [deviceStorage]);
@@ -86,6 +91,7 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
     const request = ++requestRef.current;
     coordinatorRef.current?.dispose();
     activeUserRef.current = nextUser;
+    remoteStateRef.current = null;
     setUser(nextUser);
     setInitialState(null);
     setActionError("");
@@ -97,13 +103,19 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
       userId: nextUser.id,
       isOnline: () => navigator.onLine,
       onStatusChange: setSyncStatus,
+      onRemoteState: state => {
+        if (request !== requestRef.current) return;
+        remoteStateRef.current = state;
+        setInitialState(state);
+        setAppStateRevision(revision => revision + 1);
+      },
     });
     coordinatorRef.current = coordinator;
     try {
       const hydrated = await coordinator.hydrate();
       if (request !== requestRef.current) return;
       setSyncStatus(hydrated.status);
-      setInitialState(hydrated.state);
+      setInitialState(remoteStateRef.current ?? hydrated.state);
       setPhase("ready");
     } catch {
       if (request !== requestRef.current) return;
@@ -112,18 +124,6 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
       setPhase("load-error");
     }
   }, [deviceStorage, resolvedServices]);
-
-  const checkSession = useCallback(async () => {
-    if (!resolvedServices) return;
-    setPhase("loading");
-    try {
-      const current = await resolvedServices.auth.currentUser();
-      if (current) await openUser(current);
-      else closeUser();
-    } catch {
-      setPhase("load-error");
-    }
-  }, [closeUser, openUser, resolvedServices]);
 
   useEffect(() => {
     if (!resolvedServices) return;
@@ -136,16 +136,13 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
       }
       if (activeUserRef.current?.id !== nextUser.id) void openUser(nextUser);
     });
-    queueMicrotask(() => {
-      if (active) void checkSession();
-    });
     return () => {
       active = false;
       requestRef.current += 1;
       unsubscribe();
       coordinatorRef.current?.dispose();
     };
-  }, [checkSession, closeUser, openUser, resolvedServices]);
+  }, [closeUser, openUser, resolvedServices]);
 
   useEffect(() => {
     const retry = () => {
@@ -162,7 +159,7 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
 
   if (phase === "configuration-error") return <StartupScreen error="configuration" />;
   if (phase === "loading" || phase === "opening-user") return <StartupScreen />;
-  if (phase === "load-error") return <StartupScreen error="load" retry={() => activeUserRef.current ? void openUser(activeUserRef.current) : void checkSession()} />;
+  if (phase === "load-error") return <StartupScreen error="load" retry={() => activeUserRef.current ? void openUser(activeUserRef.current) : setPhase("loading")} />;
   if (phase === "signed-out" || !user || !initialState || !resolvedServices) {
     const authenticate = (action: (credentials: Credentials) => Promise<AccountUser>) => async (credentials: Credentials) => {
       try {
@@ -210,12 +207,14 @@ export function GoalioAccountApp({ services, storage }: GoalioAccountAppProps) {
         </div>
       )}
       {actionError && <p className="account-action-error" role="alert">{actionError}</p>}
+      <Suspense fallback={<StartupScreen />}>
       <GoalioApp
-        key={user.id}
+        key={`${user.id}:${appStateRevision}`}
         initialState={initialState}
         onStateChange={state => coordinatorRef.current?.record(state)}
         account={{ email: user.email, syncStatus, signingOut, onRetrySync: retrySync, onSignOut: () => void signOut() }}
       />
+      </Suspense>
     </div>
   );
 }

@@ -10,7 +10,10 @@ vi.mock("@/lib/account/supabase", () => ({
       signUp: vi.fn(),
       signIn: vi.fn(),
       signOutCurrentDevice: vi.fn(),
-      onChange: vi.fn(() => () => undefined),
+      onChange: vi.fn(listener => {
+        queueMicrotask(() => listener(null));
+        return () => undefined;
+      }),
     },
     cloud: {
       load: vi.fn(async () => null),

@@ -33,7 +33,10 @@ function fakeServices(options: FakeServiceOptions = {}) {
     signUp: vi.fn(async () => options.signUpUser ?? userA),
     signIn: vi.fn(async () => options.signUpUser ?? userA),
     signOutCurrentDevice: vi.fn(async () => undefined),
-    onChange: vi.fn(() => () => undefined),
+    onChange: vi.fn(listener => {
+      queueMicrotask(() => listener(options.currentUser ?? null));
+      return () => undefined;
+    }),
   } satisfies AuthGateway;
   const cloud = {
     load: vi.fn(async () => options.cloudState ?? null),
