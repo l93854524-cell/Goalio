@@ -1,43 +1,36 @@
-# Goalio Purchase Result Design QA
-
-- Safe-state visual truth: `/Users/apple/.codex/generated_images/01a0867f-1b32-7ed3-936b-f8afa40f5acb/exec-21bf6153-fb3a-4fe3-8f33-5592f15335f1.png`
-- Impact-state visual truth: `/Users/apple/.codex/generated_images/01a0867f-1b32-7ed3-936b-f8afa40f5acb/exec-6e7c4ef4-fd33-4f44-bccd-1e9386e0541b.png`
-- Implementation: `http://localhost:3000/`
-- Implementation screenshots: Codex in-app browser viewport and full-page captures emitted inline in the task; this browser surface did not expose filesystem paths.
-- Browser viewport: 1202 × 814 CSS px, with the product surface constrained to 430 CSS px.
-
-## Source and implementation comparison
-
-The approved references and browser implementation were reviewed together for both result branches. The implementation retains the reference hierarchy: centered Goalio wordmark, one circular back arrow at top left, a large state icon, direct headline, compact purchase summary, and restrained supporting actions.
-
-The safe state uses blue, contains no budget or delay recommendations, and presents a primary return-home action. The impact state uses red for the warning symbol and impact copy, then presents the budget and delay recommendations without chevrons.
-
-## Fidelity checks
-
-- Typography: Apple system and PingFang stack, compact display headlines, muted secondary copy.
-- Navigation: only the top-left arrow remains; its accessible name is `返回主页`.
-- Color: blue safe state and red impact state match the approved direction.
-- Recommendation rows: Phosphor wallet and calendar icons; no text-symbol or CSS-drawn assets; no right arrows.
-- Layout: the result page scrolls vertically on shorter windows, keeping `修改商品或金额` reachable.
-- Branching: safe and impact content are mutually exclusive.
-- Accessibility: buttons retain explicit names and visible focus treatments.
-
-## Interaction evidence
-
-- Clicked the impact-state top-left arrow and confirmed the home dashboard appeared.
-- Entered the purchase flow again with a safe amount and confirmed only the safe result appeared.
-- Clicked `修改商品或金额` and confirmed the purchase editor appeared with the entered values preserved.
-- Checked browser warnings and errors; none were reported.
-
-## Verification evidence
-
-- Targeted purchase-result tests: 3 passed.
-- Full automated suite: 77 passed across 9 files.
-- ESLint: passed with zero errors.
-- Next.js production build: completed successfully.
-
-## Findings
-
-The first browser pass exposed one P2 issue: short viewports clipped the lower edit action. The result screen now scrolls vertically, and the full-page follow-up capture confirmed the action is reachable. No P0, P1, or P2 differences remain in the approved scope.
+# Goalio 独立图片板块设计验证
 
 final result: passed
+
+检查日期：2026-10-08。已确认的 Hello Kitty 效果图与运行中的首页在同一份对比图内检查，均按 430px 内容宽度、9 月 6 日演示日期、「国庆」目标、¥31 预留金额、3.8% 进度、10 月 1 日、¥35、¥5,813 对齐。
+
+## 视觉证据
+
+- 已确认效果图：`/Users/apple/.codex/generated_images/01a11908-6083-7381-a09a-9b77d032c816/exec-9b662cd0-460f-4cc4-8b23-ae854c0571f2.png`
+- 首轮对比：`output/playwright/kitty-design-comparison-first.jpg`
+- 修正后对比：`output/playwright/kitty-design-comparison.jpg`
+- 实际页面：`output/playwright/kitty-home-final.jpg`
+- 运行页面：`http://127.0.0.1:3000/`，内置浏览器第 3 个标签页。
+
+## 迭代与结论
+
+首轮发现 P2：主卡片默认居中裁切导致角色右侧被切掉；主卡片偏高；三张金额卡片插画偏小、整体遮罩偏重。已将主图定位至右下角，主卡片从 393px 收紧至 338px，调整下方插画比例，并将整图遮罩降至 12%，文字区域保留 88% 白色遮罩。修正后重新截图及同图对比，角色、日期和金额完整可见。
+
+五张独立图片对应目标概览、目标进度、预计准备好、明天基本开销和当前最多可额外支出。标题、金额、说明、进度条和按钮均为真实页面内容，背景图不含金额文字。未发现待修复的 P0/P1/P2 问题。
+
+360px、430px 宽度检查无横向溢出；窄屏日期换行显示。
+
+后续玻璃质感调整：文字区域白底从 88% 改为 48%，圆角改为 14px，并加入 14px 背景模糊。更新余额和计算说明使用 66% 的玻璃背景。同步加深说明文字与强调色，保留金额可读性。已在浏览器确认标准 `backdrop-filter` 生效；兼容前缀置于标准声明前，避免本地 CSS 优化器只保留前缀声明。最终效果见 `output/playwright/kitty-glass-final.jpg`。本次仅调整 CSS，由主智能体单独完成，未重新生成图片。
+
+P3 差异：真实页面采用已有本地字体，字形与生成图略有差别；保留原有演示日期控制台及底部留白，页面总高度略大。控制台和开发工具属于已有预览功能。不存在新增页面、贴纸层、商店或同步功能。
+
+## 行为与代码验证
+
+- 实际选择本地 `goal.png`，浏览器转换为 JPEG Data URL，仅目标板块发生替换；刷新后仍保留，¥31 和其余四张图片保持不变。
+- 单块移除只清除该板块；恢复默认清除全部图片与主题。最终预览已重新应用完整 Hello Kitty 示例。
+- 原有购买评估入口可进入表单并返回首页。
+- 页面控制台未发现错误；独立只读代码审查未发现 P1/P2 阻塞问题。
+- `npm run lint`、`npm run build`、9 项个性化集成测试通过。
+- 全量测试 141 项，131 项通过，10 项为之前已记录的相同失败，清单见 `output/playwright/personalization-verification.md`。未修改核心计算、账户同步或这些历史失败。
+
+本地图片设置单独保存在 `goalio:appearance:v1`，未加入业务状态或账号同步。旧版主题和首页背景设置仍可读取。非本地来源、SVG、损坏设置会被过滤；存储配额不足会提示并保留上次成功保存的外观。

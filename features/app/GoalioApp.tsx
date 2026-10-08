@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CalendarBlank, CheckCircle, Wallet, Warning } from "@phosphor-icons/react";
 import { PressableButton } from "@/components/ui/PressableButton";
+import { PersonalizationSettings } from "@/features/personalization/PersonalizationSettings";
+import { HomeImageCard } from "@/features/personalization/HomeImageCard";
+import { usePersonalization, type Personalization, type BlockBackgrounds } from "@/features/personalization/usePersonalization";
 import { addDays, addMonths, formatChineseDate, formatChineseFullDate, todayISO } from "@/lib/domain/dates";
 import { cents, formatYuan, parseYuan, type Cents } from "@/lib/domain/money";
 import type { BalanceSnapshot, Cadence, FixedExpense, ScheduledAmount } from "@/lib/domain/types";
@@ -409,7 +412,7 @@ function needsDailyCheckIn(state: GoalioState, today: string) {
   return !state.lastResult || state.lastResult.date < today;
 }
 
-function HomeScreen({ state, update, go, today }: ScreenProps & { today: string }) {
+function HomeScreen({ state, update, go, today, background, blocks }: ScreenProps & { today: string; background: string | null; blocks: BlockBackgrounds }) {
   const previous = state.lastResult ? { date: state.lastResult.date, effectiveSaved: state.lastResult.effectiveSaved } : undefined;
   const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
   const saved = result.effectiveSaved;
@@ -419,17 +422,37 @@ function HomeScreen({ state, update, go, today }: ScreenProps & { today: string 
     ? cents(Math.max(0, result.requiredReserve - state.balance))
     : cents(0);
   return (
-    <Screen>
+    <Screen className="home-screen">
+      {background && <div className="home-background" aria-hidden="true" style={{ backgroundImage: `url("${background}")` }} />}
+      <HomeImageCard block="goal" label="目标概览" image={blocks.goal} className="goal-image-card">
       <TopBar
         center={<time className="home-date" dateTime={today}>{formatChineseFullDate(today)}</time>}
         right={<div className="home-actions"><button onClick={() => go("daily-balance")}>更新余额</button><button aria-label="设置" onClick={() => go("settings")}>•••</button></div>}
       />
-      <div className="content home-content">
+      <div className="home-goal-content">
         <h1>正在为「{state.plan.goal.name}」准备</h1>
-        <p className="metric-label">已为目标留好</p>
+        <p className="metric-label">当前需要为目标预留</p>
         <div className="hero-amount">{formatYuan(saved)}</div>
-        <div className="progress-track" data-trend={change < 0 ? "down" : "up"} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(2, progress)}%` }} /></div>
+        <p className="reserve-note">其余目标资金预计可由未来收入逐步补足。</p>
+        <details className="calculation-explainer">
+          <summary>为什么只需要预留 {formatYuan(saved)}？</summary>
+          <div className="calculation-explainer-body">
+            <h2>Goalio 是怎么计算的？</h2>
+            <p>你现在有 {formatYuan(state.balance)}。接下来还会收到确定收入，同时还需要支付生活费和固定支出。</p>
+            <p>Goalio 会先确保未来必要支出有钱支付，再判断你的储蓄目标还需要从今天的余额中提前留下多少。</p>
+            <p>按照你现在的计划，只需要提前预留 {formatYuan(saved)}，未来收入即可继续承担剩余目标储蓄。</p>
+            <div className="cash-flow" aria-label="资金安排：当前余额加未来收入，减去生活支出、固定支出和目标所需资金，得到当前安全可动用金额">
+              <span>当前余额 {formatYuan(state.balance)}</span><b>＋</b><span>未来收入</span><b>−</b><span>生活支出</span><b>−</b><span>固定支出</span><b>−</b><span>目标所需资金</span><b>＝</b><span>当前安全可动用金额</span>
+            </div>
+          </div>
+        </details>
+      </div>
+      </HomeImageCard>
+      <div className="content home-content">
+        <HomeImageCard block="progress" label="目标进度" image={blocks.progress} className="progress-image-card">
         <p className="progress-copy">目标 {formatYuan(state.plan.goal.amount)} · 已完成 {progress}%</p>
+        <div className="progress-track" data-trend={change < 0 ? "down" : "up"} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(2, progress)}%` }} /></div>
+        </HomeImageCard>
         <section className="change-block reveal-1">
           <strong>{change < 0 ? `今天的目标进度减少了 ${formatYuan(cents(Math.abs(change)))}` : change > 0 ? `今天多留了 ${formatYuan(change)}` : "今天的目标进度保持不变"}</strong>
           <p>{change < 0 ? "最近的余额发生了变化，我先把接下来的生活和固定支出照顾好。" : change > 0 ? "当前余额照顾好未来生活和固定支出后，又有更多可以安心留给目标。" : "目前的余额刚好适合维持现在的安排。"}</p>
@@ -437,12 +460,12 @@ function HomeScreen({ state, update, go, today }: ScreenProps & { today: string 
         {result.status === "known" ? (
           <div className="reveal-2">
             <div className="result-list">
-              <div><span>预计准备好</span><strong>{result.completionDate ? formatChineseDate(result.completionDate, today) : "暂时未知"}</strong></div>
-              <div><span>明天的基本开销</span><strong>{formatYuan(result.tomorrowFood)}</strong></div>
-              {result.canMeetDeadline && <div><span>明天额外最多可花</span><strong>{formatYuan(result.tomorrowMaxSpend)}</strong></div>}
+              <HomeImageCard block="completion" label="预计准备好" image={blocks.completion}><span>预计准备好</span><strong>{result.completionDate ? formatChineseDate(result.completionDate, today) : "暂时未知"}</strong></HomeImageCard>
+              <HomeImageCard block="daily" label="明天的基本开销" image={blocks.daily}><span>明天的基本开销</span><strong>{formatYuan(result.tomorrowFood)}</strong></HomeImageCard>
+              {result.canMeetDeadline && <HomeImageCard block="spending" label="当前最多可额外支出" image={blocks.spending}><span>当前最多可额外支出</span><strong>{formatYuan(result.tomorrowMaxSpend)}</strong></HomeImageCard>}
             </div>
             {result.canMeetDeadline ? (
-              <p className="spend-note">这个金额不包含明天的基本开销，不会动用已为目标留好的钱，并已确保按当前计划仍能在目标日期前准备好。实际余额或计划变化后会重新计算。</p>
+              <p className="spend-note">安全范围内 · 距离资金安全边界还有 {formatYuan(result.tomorrowMaxSpend)}。花到这个金额附近后，你的未来必要支出或目标计划将开始受到影响。实际余额或计划变化后会重新计算。</p>
             ) : reserveGap > 0 ? (
               <div className="deadline-adjustment">
                 <strong>近期基本开销还差 {formatYuan(reserveGap)}</strong>
@@ -484,25 +507,30 @@ function PurchaseInputScreen({ state, update, go }: ScreenProps) {
 }
 
 function resultCopy(result: PurchaseEvaluation, today: string) {
-  if (result.kind === "shortfall") return { title: "这笔消费会影响安排", kicker: `未来可能缺少 ${formatYuan(result.amount)}`, body: "建议降低预算，或等余额更充足时再购买。" };
-  if (result.kind === "unknown") return { title: "现在还无法放心判断", kicker: "还缺少一些信息", body: `目前缺少${result.missing.join("、")}，暂时无法可靠计算这笔消费会带来多少影响。` };
-  if (result.kind === "unreachable") return { title: "这笔消费会影响目标", kicker: "完成时间将无法确定", body: "按当前余额和计划，暂时无法可靠预测目标的完成日期。" };
+  if (result.kind === "shortfall") return { title: "当前不建议支出这么多", kicker: `未来预计会出现 ${formatYuan(result.amount)} 的资金缺口`, body: `支出后，当前余额将不足以覆盖未来必要支出和目标安排，预计还差 ${formatYuan(result.amount)}。可以降低预算，或等余额更充足时再购买。` };
+  if (result.kind === "unknown") return { title: "现在还无法判断这笔消费", kicker: "还缺少一些信息", body: `目前缺少${result.missing.join("、")}，因此无法确认支出后能否覆盖必要支出或目标计划。补充信息后可以重新计算。` };
+  if (result.kind === "unreachable") return { title: "现在还无法判断目标时间", kicker: "完成时间将无法确定", body: "按当前余额和计划，暂时无法可靠预测目标的完成日期，因此也无法判断这笔消费的具体影响。" };
   if (result.kind === "progress-reduced") return {
-    title: "仍然可以购买",
+    title: "可以买，但会影响目标进度",
     kicker: "预计完成时间保持不变",
-    body: `会挤占当前已留金额 ${formatYuan(result.amount)}，后续结余将优先补回。`,
+    body: `支出后，必要生活资金仍然安全；这笔消费会占用已为目标预留的 ${formatYuan(result.amount)}，后续结余将优先补回。`,
   };
-  if (result.kind === "no-impact") return { title: "可以安心购买", kicker: "这笔消费不会影响目标进度", body: "预计完成时间保持不变" };
+  if (result.kind === "no-impact") return { title: "这笔消费目前在安全范围内", kicker: "安全范围内 · 目标计划不变", body: `支出后，你仍然可以覆盖未来必要支出，并维持当前目标计划。预计完成时间为 ${formatChineseDate(result.completionDate, today)}。` };
   if (result.kind === "delayed-in-time") return {
-    title: "仍然可以购买",
-    kicker: `预计会推迟 ${result.delayDays} 天`,
-    body: `仍可在计划日期前完成，预计从 ${formatChineseDate(result.baselineDate, today)}调整到 ${formatChineseDate(result.scenarioDate, today)}。`,
+    title: "可以买，但目标会推迟",
+    kicker: `买下它，目标预计会再推迟 ${result.delayDays} 天`,
+    body: `支出后，你的必要生活资金仍然安全，当前目标计划会因此延后。`,
   };
   return {
-    title: "这笔消费会让目标晚于计划",
-    kicker: `晚于计划 ${result.deadlineLateDays} 天`,
-    body: `完成时间将从 ${formatChineseDate(result.baselineDate, today)}调整到 ${formatChineseDate(result.scenarioDate, today)}，较当前预计晚 ${result.delayDays} 天。`,
+    title: "可以买，但目标会推迟",
+    kicker: `买下它，目标预计会再推迟 ${result.delayDays} 天`,
+    body: `支出后，你的必要生活资金仍然安全，当前目标计划会因此延后。`,
   };
+}
+
+function formatTimelineDate(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return `${year} 年 ${month} 月 ${day} 日`;
 }
 
 function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: string }) {
@@ -511,6 +539,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
   const result = evaluatePurchase({ today, balance: state.balance, plan: state.plan, previous, ...purchase });
   const copy = resultCopy(result, today);
   const noImpact = result.kind === "no-impact";
+  const hasTimeline = result.kind === "delayed-in-time" || result.kind === "delayed";
   const showAlternatives = result.kind === "progress-reduced" || result.kind === "delayed-in-time" || result.kind === "delayed";
   return (
     <Screen className="purchase-result-screen">
@@ -519,13 +548,20 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
         <div className="result-status-icon" aria-hidden="true">
           {noImpact ? <CheckCircle size={72} weight="fill" /> : <Warning size={72} weight="fill" />}
         </div>
-        <h1>{copy.title}</h1>
-        <p className="result-kicker">{copy.kicker}</p>
-        {!noImpact && <p className="result-body">{copy.body}</p>}
         <div className="panel purchase-result-summary">
           <strong>{purchase.name} · {formatYuan(purchase.amount)}</strong>
-          {noImpact && <span>{copy.body}</span>}
         </div>
+        <h1>{copy.title}</h1>
+        <p className="result-kicker">{copy.kicker}</p>
+        <p className="result-body">{copy.body}</p>
+        {hasTimeline && (
+          <div className="purchase-timeline" aria-label="目标完成时间线">
+            <div><span>你的原计划</span><strong>{formatTimelineDate(state.plan.goal.deadline)}</strong></div>
+            <div><span>当前预计完成</span><strong>{formatTimelineDate(result.baselineDate)}</strong></div>
+            <div><span>买下后预计完成</span><strong>{formatTimelineDate(result.scenarioDate)}</strong></div>
+            {result.kind === "delayed" && <p>买下后，将比你最初设定的目标日期晚 {result.deadlineLateDays} 天。</p>}
+          </div>
+        )}
         {showAlternatives && (
           <div className="panel alternatives">
             <div className="alternative-row"><span className="alternative-icon" aria-hidden="true"><Wallet size={28} weight="regular" /></span><div><span>降低预算</span><strong>今天最多花 {formatYuan(result.maxNoDelayAmount)}</strong><small>保持原来的完成时间</small></div></div>
@@ -539,7 +575,7 @@ function PurchaseResultScreen({ state, go, today }: ScreenProps & { today: strin
   );
 }
 
-function SettingsScreen({ state, go, today, account }: ScreenProps & { today: string; account?: GoalioAccountControls }) {
+function SettingsScreen({ state, go, today, account, personalization }: ScreenProps & { today: string; account?: GoalioAccountControls; personalization: Personalization }) {
   const income = state.plan.income;
   const incomeDate = income ? nextIncomeDate(income, today) : null;
   return (
@@ -553,6 +589,7 @@ function SettingsScreen({ state, go, today, account }: ScreenProps & { today: st
           <button onClick={() => go("goal")}><strong>当前目标</strong><span>{state.plan.goal.name} · {formatYuan(state.plan.goal.amount)} · {formatChineseDate(state.plan.goal.deadline, today)}</span><b>›</b></button>
         </div>
         <button className="text-button standalone" onClick={() => go("income")}>重新安排</button>
+        <PersonalizationSettings settings={personalization} />
         {account && (
           <section className="account-settings" aria-labelledby="account-settings-title">
             <h2 id="account-settings-title">账号</h2>
@@ -609,6 +646,7 @@ export interface GoalioAppProps {
 }
 
 export function GoalioApp({ initialState, onStateChange, account }: GoalioAppProps) {
+  const personalization = usePersonalization();
   const [demoDate, setDemoDate] = useState("2026-09-06");
   const demo = process.env.NEXT_PUBLIC_GOALIO_DEMO_DATE === "true" || process.env.NODE_ENV === "development";
   const today = demo ? demoDate : todayISO();
@@ -656,12 +694,12 @@ export function GoalioApp({ initialState, onStateChange, account }: GoalioAppPro
       const result = runSimulation({ today, balance: state.balance, plan: state.plan, previous });
       view = result.status === "known" && result.effectiveSaved >= state.plan.goal.amount
         ? <CompleteScreen {...props} />
-        : <HomeScreen {...props} today={today} />;
+        : <HomeScreen {...props} today={today} background={personalization.background} blocks={personalization.blocks} />;
       break;
     }
     case "purchase-input": view = <PurchaseInputScreen {...props} />; break;
     case "purchase-result": view = <PurchaseResultScreen {...props} today={today} />; break;
-    case "settings": view = <SettingsScreen {...props} today={today} account={account} />; break;
+    case "settings": view = <SettingsScreen {...props} today={today} account={account} personalization={personalization} />; break;
     case "complete": view = <CompleteScreen {...props} />; break;
     case "post-purchase": view = <BalanceScreen {...props} daily today={today} />; break;
     case "finished": view = <FinishedScreen state={state} />; break;
@@ -669,7 +707,7 @@ export function GoalioApp({ initialState, onStateChange, account }: GoalioAppPro
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={personalization.theme}>
       {view}
       {demo && state.onboarded && <aside className="demo-control" aria-label="演示日期控制台"><span>演示日期 · {formatChineseDate(demoDate)}</span><button aria-label="前一天" onClick={() => moveDemoDate(-1)}>−</button><button aria-label="后一天" onClick={() => moveDemoDate(1)}>＋</button></aside>}
     </div>

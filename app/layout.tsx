@@ -1,5 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
+
+const roundedChinese = localFont({
+  src: "./fonts/ZCOOLKuaiLe-Regular.ttf",
+  variable: "--font-goalio-chinese",
+  weight: "400",
+  display: "swap",
+  adjustFontFallback: false,
+});
+
+const roundedLatin = localFont({
+  src: "./fonts/Nunito-Variable.ttf",
+  variable: "--font-goalio-latin",
+  weight: "200 1000",
+  display: "swap",
+  adjustFontFallback: false,
+});
 
 export const metadata: Metadata = {
   title: "Goalio — 把今天的余额，变成更安心的决定",
@@ -17,7 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" className={`${roundedChinese.variable} ${roundedLatin.variable}`}>
       <body>{children}</body>
     </html>
   );
