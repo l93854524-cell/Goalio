@@ -426,14 +426,14 @@ function HomeScreen({ state, update, go, today, background, blocks }: ScreenProp
       {background && <div className="home-background" aria-hidden="true" style={{ backgroundImage: `url("${background}")` }} />}
       <HomeImageCard block="goal" label="目标概览" image={blocks.goal} className="goal-image-card">
       <TopBar
-        center={<time className="home-date" dateTime={today}>{formatChineseFullDate(today)}</time>}
-        right={<div className="home-actions"><button onClick={() => go("daily-balance")}>更新余额</button><button aria-label="设置" onClick={() => go("settings")}>•••</button></div>}
+        center={<time className="home-date" dateTime={today}><span className="home-glass-text">{formatChineseFullDate(today)}</span></time>}
+        right={<div className="home-actions"><button onClick={() => go("daily-balance")}><span className="home-glass-text">更新余额</span></button><button aria-label="设置" onClick={() => go("settings")}><span className="home-glass-text">•••</span></button></div>}
       />
       <div className="home-goal-content">
-        <h1>正在为「{state.plan.goal.name}」准备</h1>
+        <h1><span className="home-glass-text">正在为「{state.plan.goal.name}」准备</span></h1>
         <p className="metric-label">当前需要为目标预留</p>
         <div className="hero-amount">{formatYuan(saved)}</div>
-        <p className="reserve-note">其余目标资金预计可由未来收入逐步补足。</p>
+        <p className="reserve-note"><span className="home-glass-text">其余目标资金预计可由未来收入逐步补足。</span></p>
         <details className="calculation-explainer">
           <summary>为什么只需要预留 {formatYuan(saved)}？</summary>
           <div className="calculation-explainer-body">
@@ -450,7 +450,7 @@ function HomeScreen({ state, update, go, today, background, blocks }: ScreenProp
       </HomeImageCard>
       <div className="content home-content">
         <HomeImageCard block="progress" label="目标进度" image={blocks.progress} className="progress-image-card">
-        <p className="progress-copy">目标 {formatYuan(state.plan.goal.amount)} · 已完成 {progress}%</p>
+        <p className="progress-copy"><span className="home-glass-text">目标 {formatYuan(state.plan.goal.amount)} · 已完成 {progress}%</span></p>
         <div className="progress-track" data-trend={change < 0 ? "down" : "up"} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${Math.max(2, progress)}%` }} /></div>
         </HomeImageCard>
         <section className="change-block reveal-1">
